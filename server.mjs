@@ -26,7 +26,7 @@ function loadEnvFile() {
 
 loadEnvFile();
 
-const publicDir = join(__dirname, "public");
+const publicDir = __dirname;
 const port = Number(process.env.PORT || 3000);
 const model = process.env.OPENAI_MODEL || "gpt-5.6";
 
