@@ -64,6 +64,7 @@ const WIND_LOCATION_FALLBACKS = {
 const BRIDGES = [
   {
     id: "botlekbrug",
+    windAlertAboveBft: 8,
     name: "Botlekbrug",
     short: "A15 · Oude Maas",
     isrs: "NLRTM001110888700281",
@@ -77,6 +78,7 @@ const BRIDGES = [
   },
   {
     id: "spijkenisserbrug",
+    windAlertAboveBft: 8,
     name: "Spijkenisserbrug",
     short: "S102 · Oude Maas",
     isrs: "NLSPI001110572700266",
@@ -90,6 +92,7 @@ const BRIDGES = [
   },
   {
     id: "brug-over-de-noord",
+    windAlertAboveBft: 5,
     name: "Brug over de Noord",
     short: "Alblasserdamsebrug · N915",
     isrs: "NLHIA001010577301210",
@@ -103,6 +106,7 @@ const BRIDGES = [
   },
   {
     id: "papendrechtsebrug",
+    windAlertAboveBft: 6,
     name: "Papendrechtsebrug",
     short: "Merwedebrug · N3",
     isrs: "NLDOR001010577001143",
@@ -116,6 +120,7 @@ const BRIDGES = [
   },
   {
     id: "hartelbrug",
+    windAlertAboveBft: 7,
     name: "Hartelbrug",
     short: "N218 · Hartelkanaal",
     isrs: "NLRTM0115B5487800010",
@@ -129,6 +134,7 @@ const BRIDGES = [
   },
   {
     id: "wantijbrug",
+    windAlertAboveBft: 6,
     name: "Wantijbrug",
     short: "N3 · Dordrecht",
     isrs: "NLDOR001100553200025",
@@ -1310,7 +1316,7 @@ main{height:100dvh;padding:8px;display:grid;grid-template-columns:repeat(3,minma
 .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
 h2{font-size:clamp(22px,2.15vw,34px);line-height:1;margin:0;font-weight:900;letter-spacing:-.035em}.short{font-size:11px;color:var(--muted);margin-top:4px;font-weight:700}.badge{font-size:9px;font-weight:900;letter-spacing:.04em;border-radius:999px;padding:5px 7px;background:#343638;color:#d9d4cd;border:1px solid #4a4c4e;white-space:nowrap}.card[data-live="open"] .badge{background:#4b2521;color:#ff9b91;border-color:#7a3932}.card[data-live="planned"] .badge,.card[data-live="requested"] .badge{background:#3a291b;color:#ffb367;border-color:#6b4527}.card[data-live="unavailable"] .badge{background:#303234;color:#aaa49c}
 .next{background:linear-gradient(135deg,#202224,#2b2119);color:#fff;border:1px solid #59402b;border-radius:11px;padding:9px 12px}.next-label{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:#d6a474;font-weight:900}.next-time{font-size:clamp(40px,4.6vw,70px);font-weight:900;line-height:.93;margin-top:4px;letter-spacing:-.045em;color:var(--orange)}.next-day{font-size:11px;color:#d4cec7;margin-top:5px;font-weight:700}
-.data-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.data-box{min-width:0;border-radius:10px;padding:8px 9px;background:var(--pale);border:1px solid var(--line)}.data-label{font-size:9px;text-transform:uppercase;letter-spacing:.075em;color:#c18b5b;font-weight:900}.water-value,.wind-value{font-size:clamp(20px,2vw,31px);font-weight:900;line-height:1;margin-top:4px;color:var(--orange)}.data-detail{font-size:9px;line-height:1.2;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.live-value{font-size:clamp(14px,1.35vw,20px);font-weight:900;line-height:1.05;margin-top:5px;color:#f5f3ef}.live-detail{font-size:9px;color:var(--muted);margin-top:5px;line-height:1.2}
+.data-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.data-box{min-width:0;border-radius:10px;padding:8px 9px;background:var(--pale);border:1px solid var(--line)}.data-label{font-size:9px;text-transform:uppercase;letter-spacing:.075em;color:#c18b5b;font-weight:900}.water-value,.wind-value{font-size:clamp(20px,2vw,31px);font-weight:900;line-height:1;margin-top:4px;color:var(--orange)}@keyframes windWarningBlink{0%,100%{color:#fff;background:#3a3b3d;border-color:#fff;box-shadow:0 0 0 rgba(255,138,28,0)}50%{color:var(--orange);background:#3b2819;border-color:var(--orange);box-shadow:0 0 18px rgba(255,138,28,.7)}}.wind-alert{animation:windWarningBlink 1s steps(1,end) infinite}.wind-alert .data-label,.wind-alert .data-detail{color:inherit}.wind-alert .wind-value{color:inherit}@media(prefers-reduced-motion:reduce){.wind-alert{animation-duration:2.4s}}.data-detail{font-size:9px;line-height:1.2;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.live-value{font-size:clamp(14px,1.35vw,20px);font-weight:900;line-height:1.05;margin-top:5px;color:#f5f3ef}.live-detail{font-size:9px;color:var(--muted);margin-top:5px;line-height:1.2}
 .schedule{flex:1;background:#292b2d;border:1px solid #3c3e40;border-radius:9px;padding:7px 9px;font-size:10px;line-height:1.25;color:#c7c1ba;overflow:hidden}.schedule strong{color:var(--orange)}
 .foot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-top:5px;border-top:1px solid var(--line);font-size:8px;color:var(--muted)}.links{display:flex;gap:8px}.foot a{color:var(--orange);font-weight:900;text-decoration:none}.status{position:fixed;right:10px;bottom:3px;font-size:8px;color:#b7afa7;background:rgba(27,28,29,.94);border:1px solid #3b3d3f;padding:2px 5px;border-radius:5px;pointer-events:none}
 @media(max-width:850px){main{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:5px;padding:5px}.card{padding:7px;gap:4px;border-radius:9px}h2{font-size:18px}.short{font-size:8px}.next{padding:6px 8px}.next-time{font-size:31px}.next-label,.next-day{font-size:8px}.data-row{gap:4px}.data-box{padding:5px}.water-value,.wind-value{font-size:18px}.live-value{font-size:12px}.data-detail,.live-detail{font-size:7px}.schedule{font-size:8px;padding:5px}.badge{font-size:7px;padding:3px 5px}.foot{font-size:6px}}
@@ -1347,15 +1353,17 @@ function beaufort(mps){
   let force=0;while(force<limits.length&&mps>=limits[force])force+=1;return force;
 }
 function wind(b){
-  if(typeof b.windSpeedMps!=='number')return {value:'—',detail:b.windMessage||'Geen actuele meting'};
+  if(typeof b.windSpeedMps!=='number')return {value:'—',detail:b.windMessage||'Geen actuele meting',bft:null};
   const dir=compassDirection(b.windDirectionDegrees);
-  const bits=[beaufort(b.windSpeedMps)+' Bft'];
+  const bft=beaufort(b.windSpeedMps);
+  const bits=[bft+' Bft'];
   if(dir)bits.push(dir);
   if(typeof b.windDistanceKm==='number')bits.push(b.windDistanceKm.toLocaleString('nl-NL',{maximumFractionDigits:1})+' km');
   if(b.windMeasuredAt)bits.push(timeFmt.format(new Date(b.windMeasuredAt)));
   return {
     value:b.windSpeedMps.toLocaleString('nl-NL',{minimumFractionDigits:1,maximumFractionDigits:1})+' m/s',
-    detail:bits.join(' · ')
+    detail:bits.join(' · '),
+    bft
   };
 }
 function live(b){
@@ -1366,11 +1374,14 @@ function render(data){
   cards.innerHTML='';
   for(const b of data.bridges){
     const o=opportunity(b),w=water(b),v=wind(b),l=live(b);
+    const windAlert=typeof v.bft==='number'&&typeof b.windAlertAboveBft==='number'&&v.bft>b.windAlertAboveBft;
+    const windBoxClass=windAlert?'data-box wind-alert':'data-box';
+    const windTitle=windAlert?'Windwaarschuwing: '+v.bft+' Bft is hoger dan '+b.windAlertAboveBft+' Bft':'Actuele wind';
     const article=document.createElement('article');article.className='card';article.dataset.live=b.liveStatus;
     article.innerHTML=
       '<div class="top"><div><h2>'+escapeHtml(b.name)+'</h2><div class="short">'+escapeHtml(b.short)+'</div></div><span class="badge">'+escapeHtml(b.liveLabel.replace('NDW: ',''))+'</span></div>'+ 
       '<div class="next"><div class="next-label">'+escapeHtml(b.opportunityLabel)+'</div><div class="next-time">'+escapeHtml(o.time)+'</div><div class="next-day">'+escapeHtml(o.day)+'</div></div>'+ 
-      '<div class="data-row"><div class="data-box"><div class="data-label">Actuele waterstand</div><div class="water-value">'+escapeHtml(w.value)+'</div><div class="data-detail" title="'+escapeHtml(b.waterLocationName||'')+'">'+escapeHtml(w.detail)+'</div></div><div class="data-box"><div class="data-label">Actuele wind</div><div class="wind-value">'+escapeHtml(v.value)+'</div><div class="data-detail" title="'+escapeHtml(b.windLocationName||'')+'">'+escapeHtml(v.detail)+'</div></div><div class="data-box"><div class="data-label">Concrete opening NDW</div><div class="live-value">'+escapeHtml(l.value)+'</div><div class="live-detail">'+escapeHtml(l.detail)+'</div></div></div>'+ 
+      '<div class="data-row"><div class="data-box"><div class="data-label">Actuele waterstand</div><div class="water-value">'+escapeHtml(w.value)+'</div><div class="data-detail" title="'+escapeHtml(b.waterLocationName||'')+'">'+escapeHtml(w.detail)+'</div></div><div class="'+windBoxClass+'" title="'+escapeHtml(windTitle)+'"><div class="data-label">Actuele wind</div><div class="wind-value">'+escapeHtml(v.value)+'</div><div class="data-detail" title="'+escapeHtml(b.windLocationName||'')+'">'+escapeHtml(v.detail)+'</div></div><div class="data-box"><div class="data-label">Concrete opening NDW</div><div class="live-value">'+escapeHtml(l.value)+'</div><div class="live-detail">'+escapeHtml(l.detail)+'</div></div></div>'+ 
       '<div class="schedule"><strong>Bediening pleziervaart:</strong> '+escapeHtml(b.scheduleText)+'</div>'+ 
       '<div class="foot"><span title="Water: '+escapeHtml(b.waterLocationName||'RWS meetpunt')+' · Wind: '+escapeHtml(b.windLocationName||'RWS windmeetpunt')+'">RWS water · windmeetpunt: '+escapeHtml(b.windLocationName||'onbekend')+'</span><span class="links"><a href="'+escapeHtml(b.scheduleSource)+'" target="_blank" rel="noopener">tijden</a><a href="'+escapeHtml(b.waterSourceUrl||'https://waterinfo.rws.nl/')+'" target="_blank" rel="noopener">metingen</a></span></div>';
     cards.appendChild(article);
