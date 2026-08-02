@@ -5,6 +5,10 @@ const PORT = Number(process.env.PORT || 3000);
 const FEED_URL =
   process.env.NDW_FEED_URL ||
   "https://opendata.ndw.nu/planningsfeed_brugopeningen.xml.gz";
+const WATER_API_URL =
+  process.env.RWS_WATER_API_URL ||
+  "https://ddapi20-waterwebservices.rijkswaterstaat.nl/ONLINEWAARNEMINGENSERVICES/OphalenLaatsteWaarnemingen";
+const WATER_SOURCE_URL = "https://waterinfo.rws.nl/";
 const REFRESH_INTERVAL_MS = Number(process.env.REFRESH_INTERVAL_MS || 300000);
 const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 20000);
 const REFRESH_SECRET = process.env.REFRESH_SECRET || "";
@@ -17,6 +21,8 @@ const BRIDGES = [
     short: "A15 · Oude Maas",
     isrs: "NLRTM001110888700281",
     scheduleType: "botlek",
+    waterLocations: ["botlek.oudemaas.botlekbrug", "botlek.oudemaas"],
+    waterLocationLabel: "Botlek Oude Maas",
     scheduleText: "Vaste tijden: :15 en :45 tussen 06:00–22:00. Werkdagen geen recreatievaart 06:30–09:30 en 15:30–18:30.",
     scheduleSource: "https://www.rijkswaterstaat.nl/wegen/projectenoverzicht/a15-botlekbrug-nieuwe-verbinding-weg-en-goederenspoorverkeer-scheepvaart-en-bromfietsers/hinder-en-maatregelen/scheepvaart"
   },
@@ -26,6 +32,8 @@ const BRIDGES = [
     short: "S102 · Oude Maas",
     isrs: "NLSPI001110572700266",
     scheduleType: "spijkenisse",
+    waterLocations: ["spijkenisse.oudemaas.brug", "spijkenisse.oudemaas"],
+    waterLocationLabel: "Spijkenisse Oude Maas",
     scheduleText: "Vaste tijd: op het halve uur tussen 06:00–22:00. Werkdagen geen recreatievaart 06:30–09:30 en 15:30–18:30.",
     scheduleSource: "https://www.rijkswaterstaat.nl/wegen/projectenoverzicht/a15-botlekbrug-nieuwe-verbinding-weg-en-goederenspoorverkeer-scheepvaart-en-bromfietsers/hinder-en-maatregelen/scheepvaart"
   },
@@ -35,6 +43,8 @@ const BRIDGES = [
     short: "Alblasserdamsebrug · N915",
     isrs: "NLHIA001010577301210",
     scheduleType: "alblasserdam",
+    waterLocations: ["alblasserdam"],
+    waterLocationLabel: "Alblasserdam",
     scheduleText: "Zomer: dagelijks 10:00, 11:00, 12:00, 13:00, 14:00 en 16:00; weekend ook 09:00, 15:00 en 18:00; werkdagen 09:15 en 18:15.",
     scheduleSource: "https://www.vaarweginformatie.nl/frp/geo/detail/BRIDGE/43523"
   },
@@ -44,6 +54,8 @@ const BRIDGES = [
     short: "Merwedebrug · N3",
     isrs: "NLDOR001010577001143",
     scheduleType: "papendrecht",
+    waterLocations: ["papendrecht", "papendrecht.benedenmerwede", "dordrecht.oudemaas.benedenmerwede"],
+    waterLocationLabel: "Beneden Merwede nabij Papendrecht",
     scheduleText: "Geen vaste bediening wegens renovatie. Een bijzondere maandelijkse opening kan alleen na aanmelding en wordt als concrete melding getoond.",
     scheduleSource: "https://www.vaarweginformatie.nl/frp/geo/detail/BRIDGE/47519"
   },
@@ -53,6 +65,8 @@ const BRIDGES = [
     short: "N218 · Hartelkanaal",
     isrs: "NLRTM0115B5487800010",
     scheduleType: "hartel",
+    waterLocations: ["europoort.hartelbrug", "hartelkanaal.vak81", "botlek.hartelkering.binnen"],
+    waterLocationLabel: "Hartelkanaal bij Hartelbrug",
     scheduleText: "24 uur op afroep, minimaal 2 uur vooraf. Werkdagen niet tijdens 06:45–08:30 en 16:00–18:30.",
     scheduleSource: "https://www.vaarweginformatie.nl/"
   },
@@ -62,6 +76,8 @@ const BRIDGES = [
     short: "N3 · Dordrecht",
     isrs: "NLDOR001100553200025",
     scheduleType: "wantij",
+    waterLocations: ["dordrecht.wantij", "dordrecht.wantij.west", "dordrecht.oudemaas.benedenmerwede"],
+    waterLocationLabel: "Wantij nabij Dordrecht",
     scheduleText: "Zomer: werkdagen 09:30–15:30 en 18:30–22:00; weekend 09:30–22:00. Bediening bij aanvraag/aanbod.",
     scheduleSource: "https://www.vaarweginformatie.nl/"
   }
@@ -459,6 +475,234 @@ function parseNdwBridgeFeed(xml) {
   };
 }
 
+
+function firstValue(...values) {
+  for (const value of values) {
+    if (value !== undefined && value !== null && value !== "") return value;
+  }
+  return null;
+}
+
+function numericValue(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().replace(",", ".").replace(/[^0-9+-.]/g, "");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function observationLists(payload) {
+  return firstValue(
+    payload?.WaarnemingenLijst,
+    payload?.waarnemingenLijst,
+    payload?.Observations,
+    payload?.observations
+  ) ?? [];
+}
+
+function measurementLists(observation) {
+  return firstValue(
+    observation?.MetingenLijst,
+    observation?.metingenLijst,
+    observation?.Measurements,
+    observation?.measurements
+  ) ?? [];
+}
+
+function observationLocationCode(observation) {
+  return String(firstValue(
+    observation?.Locatie?.Code,
+    observation?.locatie?.code,
+    observation?.Location?.Code,
+    observation?.location?.code,
+    observation?.Fenomeenlocatie?.Code,
+    observation?.fenomeenlocatie?.code
+  ) ?? "").toLowerCase();
+}
+
+function observationLocationName(observation, fallback) {
+  return String(firstValue(
+    observation?.Locatie?.Naam,
+    observation?.Locatie?.Omschrijving,
+    observation?.locatie?.naam,
+    observation?.Location?.Name,
+    observation?.location?.name,
+    fallback
+  ));
+}
+
+function observationUnit(observation, measurement) {
+  return String(firstValue(
+    measurement?.AquoMetadata?.Eenheid?.Code,
+    measurement?.aquoMetadata?.eenheid?.code,
+    observation?.AquoMetadata?.Eenheid?.Code,
+    observation?.aquoMetadata?.eenheid?.code,
+    "cm"
+  ));
+}
+
+function measurementTime(measurement) {
+  return toIsoOrNull(firstValue(
+    measurement?.Tijdstip,
+    measurement?.tijdstip,
+    measurement?.Datumtijd,
+    measurement?.datumtijd,
+    measurement?.DateTime,
+    measurement?.dateTime,
+    measurement?.Waarnemingdatumtijd,
+    measurement?.waarnemingdatumtijd
+  ));
+}
+
+function measurementNumber(measurement) {
+  return numericValue(firstValue(
+    measurement?.Meetwaarde?.Waarde_Numeriek,
+    measurement?.Meetwaarde?.Waarde_Alfanumeriek,
+    measurement?.meetwaarde?.waarde_Numeriek,
+    measurement?.meetwaarde?.waarde_Alfanumeriek,
+    measurement?.Value?.Numeric,
+    measurement?.value?.numeric,
+    measurement?.Waarde_Numeriek,
+    measurement?.Waarde_Alfanumeriek
+  ));
+}
+
+function measurementQuality(measurement) {
+  return String(firstValue(
+    measurement?.WaarnemingMetadata?.Kwaliteitswaardecode,
+    measurement?.waarnemingMetadata?.kwaliteitswaardecode,
+    measurement?.QualityCode,
+    measurement?.qualityCode,
+    ""
+  ));
+}
+
+function waterValueInMetres(value, unit) {
+  const normalized = unit.toLowerCase();
+  if (normalized === "cm") return value / 100;
+  if (normalized === "mm") return value / 1000;
+  return value;
+}
+
+function parseWaterResponse(payload) {
+  const byLocation = new Map();
+  for (const observation of observationLists(payload)) {
+    const locationCode = observationLocationCode(observation);
+    if (!locationCode) continue;
+    const locationName = observationLocationName(observation, locationCode);
+    for (const measurement of measurementLists(observation)) {
+      const time = measurementTime(measurement);
+      const value = measurementNumber(measurement);
+      const quality = measurementQuality(measurement);
+      if (!time || value === null || quality === "99") continue;
+      const unit = observationUnit(observation, measurement);
+      const candidate = {
+        locationCode,
+        locationName,
+        valueMetres: waterValueInMetres(value, unit),
+        measuredAt: time,
+        qualityCode: quality,
+        originalUnit: unit
+      };
+      const current = byLocation.get(locationCode);
+      if (!current || timestamp(candidate.measuredAt) > timestamp(current.measuredAt)) {
+        byLocation.set(locationCode, candidate);
+      }
+    }
+  }
+  return byLocation;
+}
+
+async function downloadWaterLevels() {
+  const allLocations = [...new Set(BRIDGES.flatMap((bridge) => bridge.waterLocations))];
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(WATER_API_URL, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json",
+        "x-api-key": "brugwachter-live",
+        "user-agent": "BrugwachterDashboard/4.0"
+      },
+      body: JSON.stringify({
+        LocatieLijst: allLocations.map((Code) => ({ Code })),
+        AquoPlusWaarnemingMetadataLijst: [
+          {
+            AquoMetadata: {
+              Compartiment: { Code: "OW" },
+              Grootheid: { Code: "WATHTE" }
+            }
+          }
+        ]
+      })
+    });
+    if (!response.ok) throw new Error(`Waterinfo antwoordde met HTTP ${response.status}`);
+    return parseWaterResponse(await response.json());
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function unavailableWater(bridge, message = "Geen actuele meting ontvangen") {
+  return {
+    waterLevelMetres: null,
+    waterMeasuredAt: null,
+    waterLocationCode: null,
+    waterLocationName: bridge.waterLocationLabel,
+    waterStatus: "unavailable",
+    waterMessage: message,
+    waterSourceUrl: WATER_SOURCE_URL
+  };
+}
+
+function waterForBridge(bridge, measurements) {
+  for (const location of bridge.waterLocations) {
+    const measurement = measurements.get(location.toLowerCase());
+    if (!measurement) continue;
+    const ageMs = Date.now() - timestamp(measurement.measuredAt);
+    return {
+      waterLevelMetres: measurement.valueMetres,
+      waterMeasuredAt: measurement.measuredAt,
+      waterLocationCode: measurement.locationCode,
+      waterLocationName: bridge.waterLocationLabel,
+      waterStatus: ageMs > 6 * 60 * 60 * 1000 ? "stale" : "current",
+      waterMessage: ageMs > 6 * 60 * 60 * 1000 ? "Laatste meting is ouder dan 6 uur" : "Actuele RWS-meting",
+      waterSourceUrl: WATER_SOURCE_URL
+    };
+  }
+  return unavailableWater(bridge);
+}
+
+function mergeWaterData(data, measurements, previousData = null) {
+  const previousById = new Map((previousData?.bridges ?? []).map((bridge) => [bridge.id, bridge]));
+  return {
+    ...data,
+    waterSource: "Rijkswaterstaat Waterinfo",
+    waterSourceUrl: WATER_SOURCE_URL,
+    bridges: data.bridges.map((bridge) => {
+      const fresh = waterForBridge(bridge, measurements);
+      if (fresh.waterLevelMetres !== null) return { ...bridge, ...fresh };
+      const previous = previousById.get(bridge.id);
+      if (previous?.waterLevelMetres !== null && previous?.waterLevelMetres !== undefined) {
+        return {
+          ...bridge,
+          waterLevelMetres: previous.waterLevelMetres,
+          waterMeasuredAt: previous.waterMeasuredAt,
+          waterLocationCode: previous.waterLocationCode,
+          waterLocationName: previous.waterLocationName,
+          waterStatus: "stale",
+          waterMessage: "Laatste succesvolle RWS-meting",
+          waterSourceUrl: WATER_SOURCE_URL
+        };
+      }
+      return { ...bridge, ...fresh };
+    })
+  };
+}
+
 function fallbackData() {
   const now = new Date();
   return {
@@ -514,20 +758,35 @@ async function refreshData({ force = false } = {}) {
 
   state.refreshing = (async () => {
     state.lastAttemptAt = new Date().toISOString();
+    const previousData = state.data;
+    const errors = [];
+    let dashboardData;
+
     try {
       const xml = await downloadFeed();
-      state.data = parseNdwBridgeFeed(xml);
-      state.lastSuccessAt = new Date().toISOString();
-      state.error = null;
-      return state.data;
+      dashboardData = parseNdwBridgeFeed(xml);
     } catch (error) {
-      state.error = error instanceof Error ? error.message : String(error);
-      state.data = state.data ?? fallbackData();
-      return state.data;
-    } finally {
-      state.refreshing = null;
+      errors.push(`NDW: ${error instanceof Error ? error.message : String(error)}`);
+      dashboardData = fallbackData();
     }
-  })();
+
+    try {
+      const measurements = await downloadWaterLevels();
+      dashboardData = mergeWaterData(dashboardData, measurements, previousData);
+    } catch (error) {
+      errors.push(`Waterinfo: ${error instanceof Error ? error.message : String(error)}`);
+      dashboardData = mergeWaterData(dashboardData, new Map(), previousData);
+    }
+
+    state.data = dashboardData;
+    state.lastSuccessAt = new Date().toISOString();
+    state.error = errors.length ? errors.join(" · ") : null;
+    state.refreshing = null;
+    return state.data;
+  })().catch((error) => {
+    state.refreshing = null;
+    throw error;
+  });
   return state.refreshing;
 }
 
@@ -556,17 +815,18 @@ const HTML = `<!doctype html>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>Brugwachter Live</title>
 <style>
-:root{--bg:#eaf0f3;--card:#fff;--ink:#153243;--muted:#607580;--line:#d8e3e8;--navy:#0d3e55;--teal:#087f82;--orange:#c96f13;--red:#b83d38;--shadow:0 6px 20px rgba(24,52,67,.10)}
+:root{--bg:#e7eef1;--card:#fff;--ink:#102f40;--muted:#5a707b;--line:#d5e1e6;--navy:#0b3d54;--teal:#087e82;--pale:#eef5f6;--warm:#fff4e5;--red:#b83d38;--shadow:0 5px 18px rgba(24,52,67,.12)}
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:Arial,sans-serif;color:var(--ink)}
-main{height:100dvh;padding:10px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:10px}
-.card{min-height:0;background:var(--card);border:1px solid var(--line);border-radius:15px;box-shadow:var(--shadow);padding:13px;display:grid;grid-template-rows:auto auto auto 1fr auto;gap:7px;overflow:hidden}
-.top{display:flex;justify-content:space-between;align-items:start;gap:8px}
-h2{font-size:clamp(15px,1.5vw,22px);line-height:1.05;margin:0}.short{font-size:11px;color:var(--muted);margin-top:3px}.badge{font-size:9px;font-weight:900;letter-spacing:.04em;border-radius:999px;padding:5px 7px;background:#edf1f3;color:#566a74;white-space:nowrap}.card[data-live="open"] .badge{background:#ffe2df;color:var(--red)}.card[data-live="planned"] .badge,.card[data-live="requested"] .badge{background:#e0f3f1;color:#08716f}.card[data-live="unavailable"] .badge{background:#fff0dc;color:#8c561d}
-.next{background:var(--navy);color:#fff;border-radius:11px;padding:9px 11px}.next-label{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#a9dbe1;font-weight:800}.next-time{font-size:clamp(18px,2.2vw,29px);font-weight:900;line-height:1;margin-top:4px}.next-day{font-size:10px;color:#d9ebef;margin-top:4px}
-.schedule{font-size:11px;line-height:1.27;color:#344f5b;overflow:hidden}.live{font-size:10px;line-height:1.25;color:var(--muted);align-self:end}.live strong{color:var(--ink)}
-.foot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-top:6px;border-top:1px solid var(--line);font-size:9px;color:var(--muted)}.foot a{color:var(--teal);font-weight:800;text-decoration:none}.status{position:fixed;right:13px;bottom:5px;font-size:8px;color:#78909b;background:rgba(234,240,243,.9);padding:2px 5px;border-radius:5px;pointer-events:none}
-@media(max-width:850px){main{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:6px;padding:6px}.card{padding:8px;gap:4px;border-radius:10px}.schedule{font-size:9px}.live{font-size:8px}.next{padding:7px}.next-time{font-size:17px}.badge{font-size:7px;padding:4px}.foot{font-size:7px}}
+main{height:100dvh;padding:8px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:8px}
+.card{min-height:0;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:11px;display:flex;flex-direction:column;gap:7px;overflow:hidden}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+h2{font-size:clamp(22px,2.15vw,34px);line-height:1;margin:0;font-weight:900;letter-spacing:-.035em}.short{font-size:11px;color:var(--muted);margin-top:4px;font-weight:700}.badge{font-size:9px;font-weight:900;letter-spacing:.04em;border-radius:999px;padding:5px 7px;background:#edf1f3;color:#566a74;white-space:nowrap}.card[data-live="open"] .badge{background:#ffe2df;color:var(--red)}.card[data-live="planned"] .badge,.card[data-live="requested"] .badge{background:#dff3f1;color:#08716f}.card[data-live="unavailable"] .badge{background:#fff0dc;color:#8c561d}
+.next{background:linear-gradient(135deg,#0b3d54,#095b68);color:#fff;border-radius:11px;padding:9px 12px}.next-label{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:#b7e0e5;font-weight:900}.next-time{font-size:clamp(40px,4.6vw,70px);font-weight:900;line-height:.93;margin-top:4px;letter-spacing:-.045em}.next-day{font-size:11px;color:#d9ebef;margin-top:5px;font-weight:700}
+.data-row{display:grid;grid-template-columns:1fr 1fr;gap:7px}.data-box{min-width:0;border-radius:10px;padding:8px 9px;background:var(--pale);border:1px solid #d9e9eb}.data-label{font-size:9px;text-transform:uppercase;letter-spacing:.075em;color:#51717a;font-weight:900}.water-value{font-size:clamp(22px,2.3vw,34px);font-weight:900;line-height:1;margin-top:4px;color:#075d68}.data-detail{font-size:9px;line-height:1.2;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.live-value{font-size:clamp(14px,1.35vw,20px);font-weight:900;line-height:1.05;margin-top:5px}.live-detail{font-size:9px;color:var(--muted);margin-top:5px;line-height:1.2}
+.schedule{flex:1;background:#f5f8f9;border-radius:9px;padding:7px 9px;font-size:10px;line-height:1.25;color:#344f5b;overflow:hidden}.schedule strong{color:var(--ink)}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-top:5px;border-top:1px solid var(--line);font-size:8px;color:var(--muted)}.links{display:flex;gap:8px}.foot a{color:var(--teal);font-weight:900;text-decoration:none}.status{position:fixed;right:10px;bottom:3px;font-size:8px;color:#718993;background:rgba(231,238,241,.92);padding:2px 5px;border-radius:5px;pointer-events:none}
+@media(max-width:850px){main{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:5px;padding:5px}.card{padding:7px;gap:4px;border-radius:9px}h2{font-size:18px}.short{font-size:8px}.next{padding:6px 8px}.next-time{font-size:31px}.next-label,.next-day{font-size:8px}.data-row{gap:4px}.data-box{padding:5px}.water-value{font-size:20px}.live-value{font-size:12px}.data-detail,.live-detail{font-size:7px}.schedule{font-size:8px;padding:5px}.badge{font-size:7px;padding:3px 5px}.foot{font-size:6px}}
 </style>
 </head>
 <body>
@@ -580,39 +840,40 @@ const timeFmt=new Intl.DateTimeFormat('nl-NL',{timeZone:'Europe/Amsterdam',hour:
 const stampFmt=new Intl.DateTimeFormat('nl-NL',{timeZone:'Europe/Amsterdam',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
 function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function opportunity(b){
-  if(!b.nextOpportunity)return {time:'Niet beschikbaar',day:b.opportunityLabel};
-  const d=new Date(b.nextOpportunity);
-  const diff=d.getTime()-Date.now();
-  if(b.opportunityState==='window'&&Math.abs(diff)<60000)return {time:'NU MOGELIJK',day:'Bij aanvraag of aanbod'};
+  if(!b.nextOpportunity)return {time:'—',day:b.opportunityLabel};
+  const d=new Date(b.nextOpportunity);const diff=d.getTime()-Date.now();
+  if(b.opportunityState==='window'&&Math.abs(diff)<60000)return {time:'NU',day:'Mogelijk bij aanvraag of aanbod'};
   return {time:timeFmt.format(d),day:dayFmt.format(d)+' · opening niet gegarandeerd'};
 }
-function liveText(b){
-  if(b.liveStart){const d=new Date(b.liveStart);return '<strong>'+escapeHtml(b.liveLabel)+'</strong> · '+escapeHtml(dayFmt.format(d))+' '+escapeHtml(timeFmt.format(d));}
-  return '<strong>'+escapeHtml(b.liveLabel)+'</strong> · '+escapeHtml(b.liveMessage);
+function water(b){
+  if(typeof b.waterLevelMetres!=='number')return {value:'—',detail:b.waterMessage||'Geen actuele meting'};
+  const sign=b.waterLevelMetres>0?'+':'';
+  return {value:sign+b.waterLevelMetres.toLocaleString('nl-NL',{minimumFractionDigits:2,maximumFractionDigits:2})+' m',detail:'t.o.v. NAP · '+(b.waterMeasuredAt?timeFmt.format(new Date(b.waterMeasuredAt)):'tijd onbekend')};
+}
+function live(b){
+  if(b.liveStart){const d=new Date(b.liveStart);return {value:b.liveLabel.replace('NDW: ',''),detail:dayFmt.format(d)+' '+timeFmt.format(d)};}
+  return {value:b.liveLabel.replace('NDW: ',''),detail:b.liveMessage};
 }
 function render(data){
   cards.innerHTML='';
   for(const b of data.bridges){
-    const o=opportunity(b);
-    const article=document.createElement('article');
-    article.className='card';article.dataset.live=b.liveStatus;
+    const o=opportunity(b),w=water(b),l=live(b);
+    const article=document.createElement('article');article.className='card';article.dataset.live=b.liveStatus;
     article.innerHTML=
-      '<div class="top"><div><h2>'+escapeHtml(b.name)+'</h2><div class="short">'+escapeHtml(b.short)+'</div></div><span class="badge">'+escapeHtml(b.liveLabel.replace('NDW: ',''))+'</span></div>'+
-      '<div class="next"><div class="next-label">'+escapeHtml(b.opportunityLabel)+'</div><div class="next-time">'+escapeHtml(o.time)+'</div><div class="next-day">'+escapeHtml(o.day)+'</div></div>'+
-      '<div class="schedule">'+escapeHtml(b.scheduleText)+'</div>'+
-      '<div class="live">'+liveText(b)+'</div>'+
-      '<div class="foot"><span>ISRS '+escapeHtml(b.isrs)+'</span><a href="'+escapeHtml(b.scheduleSource)+'" target="_blank" rel="noopener">bedientijden</a></div>';
+      '<div class="top"><div><h2>'+escapeHtml(b.name)+'</h2><div class="short">'+escapeHtml(b.short)+'</div></div><span class="badge">'+escapeHtml(b.liveLabel.replace('NDW: ',''))+'</span></div>'+ 
+      '<div class="next"><div class="next-label">'+escapeHtml(b.opportunityLabel)+'</div><div class="next-time">'+escapeHtml(o.time)+'</div><div class="next-day">'+escapeHtml(o.day)+'</div></div>'+ 
+      '<div class="data-row"><div class="data-box"><div class="data-label">Actuele waterstand</div><div class="water-value">'+escapeHtml(w.value)+'</div><div class="data-detail" title="'+escapeHtml(b.waterLocationName||'')+'">'+escapeHtml(w.detail)+'</div></div><div class="data-box"><div class="data-label">Concrete opening NDW</div><div class="live-value">'+escapeHtml(l.value)+'</div><div class="live-detail">'+escapeHtml(l.detail)+'</div></div></div>'+ 
+      '<div class="schedule"><strong>Bediening pleziervaart:</strong> '+escapeHtml(b.scheduleText)+'</div>'+ 
+      '<div class="foot"><span>'+escapeHtml(b.waterLocationName||'RWS meetpunt')+'</span><span class="links"><a href="'+escapeHtml(b.scheduleSource)+'" target="_blank" rel="noopener">tijden</a><a href="'+escapeHtml(b.waterSourceUrl||'https://waterinfo.rws.nl/')+'" target="_blank" rel="noopener">water</a></span></div>';
     cards.appendChild(article);
   }
 }
 async function load(){
   try{
-    const response=await fetch('/api/dashboard',{cache:'no-store'});
-    const payload=await response.json();
-    if(!payload.data)throw new Error(payload.error||'Geen gegevens');
-    render(payload.data);
+    const response=await fetch('/api/dashboard',{cache:'no-store'});const payload=await response.json();
+    if(!payload.data)throw new Error(payload.error||'Geen gegevens');render(payload.data);
     const stamp=payload.data.publicationTime||payload.lastSuccessAt||payload.data.processedAt;
-    statusEl.textContent=(payload.error?'laatste gegevens · ':'NDW · ')+(stamp?stampFmt.format(new Date(stamp)):'tijd onbekend');
+    statusEl.textContent=(payload.error?'laatste gegevens · ':'live · ')+(stamp?stampFmt.format(new Date(stamp)):'tijd onbekend');
   }catch(error){statusEl.textContent='fout: '+(error.message||error);}
 }
 load();setInterval(load,60000);
