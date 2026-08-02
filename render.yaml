@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: brugwachter-live
+    runtime: node
+    region: frankfurt
+    plan: free
+    rootDir: brugwachter-live
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-5.6
