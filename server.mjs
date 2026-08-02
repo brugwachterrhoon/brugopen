@@ -1,476 +1,630 @@
 import http from "node:http";
-import { readFile } from "node:fs/promises";
-import { readFileSync, existsSync } from "node:fs";
-import { extname, join, normalize } from "node:path";
-import { fileURLToPath } from "node:url";
+import { gunzipSync } from "node:zlib";
 
-const __dirname = fileURLToPath(new URL(".", import.meta.url));
-
-function loadEnvFile() {
-  const envPath = join(__dirname, ".env");
-  if (!existsSync(envPath)) return;
-  const content = readFileSync(envPath, "utf8");
-  for (const rawLine of content.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#")) continue;
-    const separator = line.indexOf("=");
-    if (separator < 1) continue;
-    const key = line.slice(0, separator).trim();
-    let value = line.slice(separator + 1).trim();
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-      value = value.slice(1, -1);
-    }
-    if (!(key in process.env)) process.env[key] = value;
-  }
-}
-
-loadEnvFile();
-
-const publicDir = __dirname;
-const port = Number(process.env.PORT || 3000);
-const model = process.env.OPENAI_MODEL || "gpt-5.6";
+const PORT = Number(process.env.PORT || 3000);
+const FEED_URL =
+  process.env.NDW_FEED_URL ||
+  "https://opendata.ndw.nu/planningsfeed_brugopeningen.xml.gz";
+const REFRESH_INTERVAL_MS = Number(process.env.REFRESH_INTERVAL_MS || 300000);
+const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 20000);
+const REFRESH_SECRET = process.env.REFRESH_SECRET || "";
 
 const BRIDGES = [
-  { id: "botlekbrug", name: "Botlekbrug", waterway: "Oude Maas", location: "Rotterdam / Hoogvliet" },
-  { id: "spijkenisserbrug", name: "Spijkenisserbrug", waterway: "Oude Maas", location: "Spijkenisse / Hoogvliet" },
-  { id: "alblasserdamsebrug", name: "Alblasserdamsebrug", waterway: "De Noord", location: "Alblasserdam / Hendrik-Ido-Ambacht" },
-  { id: "papendrechtsebrug", name: "Papendrechtsebrug", waterway: "Beneden-Merwede", location: "Papendrecht / Dordrecht" },
-  { id: "hartelbrug", name: "Hartelbrug", waterway: "Hartelkanaal", location: "Spijkenisse / Botlek" },
-  { id: "wantijbrug", name: "Wantijbrug", waterway: "Wantij", location: "Dordrecht" }
+  {
+    id: "botlekbrug",
+    name: "Botlekbrug",
+    subtitle: "Nieuwe Botlekbrug · A15",
+    isrs: "NLRTM001110888700281"
+  },
+  {
+    id: "spijkenisserbrug",
+    name: "Spijkenisserbrug",
+    subtitle: "S102 · Oude Maas",
+    isrs: "NLSPI001110572700266"
+  },
+  {
+    id: "brug-over-de-noord",
+    name: "Brug over de Noord",
+    subtitle: "Alblasserdamsebrug · N915",
+    isrs: "NLHIA001010577301210"
+  },
+  {
+    id: "papendrechtsebrug",
+    name: "Papendrechtsebrug",
+    subtitle: "Merwedebrug Papendrecht · N3",
+    isrs: "NLDOR001010577001143"
+  },
+  {
+    id: "hartelbrug",
+    name: "Hartelbrug",
+    subtitle: "N218 · Hartelkanaal",
+    isrs: "NLRTM0115B5487800010"
+  },
+  {
+    id: "wantijbrug",
+    name: "Wantijbrug",
+    subtitle: "N3 · Dordrecht",
+    isrs: "NLDOR001100553200025"
+  }
 ];
 
-const OFFICIAL_DOMAINS = [
-  "rijkswaterstaat.nl",
-  "open.rijkswaterstaat.nl",
-  "vaarweginformatie.nl",
-  "waterinfo.rws.nl",
-  "rijkswaterstaatdata.nl",
-  "knmi.nl",
-  "data.knmi.nl",
-  "dataplatform.knmi.nl",
-  "pin.portofrotterdam.com",
-  "portofrotterdam.com",
-  "zuid-holland.nl",
-  "rotterdam.nl",
-  "nissewaard.nl",
-  "dordrecht.nl",
-  "papendrecht.nl",
-  "alblasserdam.nl",
-  "h-i-ambacht.nl",
-  "overheid.nl",
-  "officielebekendmakingen.nl"
-];
-
-const DASHBOARD_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  required: ["checked_at", "summary", "bridges"],
-  properties: {
-    checked_at: { type: "string" },
-    summary: { type: "string" },
-    bridges: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: [
-          "id", "status", "status_text", "next_opening", "next_opening_type",
-          "opening_updated_at", "water_label", "water_value", "water_time",
-          "wind_label", "wind_speed", "wind_direction", "wind_time", "notes", "sources"
-        ],
-        properties: {
-          id: { type: "string", enum: BRIDGES.map((bridge) => bridge.id) },
-          status: { type: "string", enum: ["beschikbaar", "beperkt", "gestremd", "geen-bediening", "onbekend"] },
-          status_text: { type: "string" },
-          next_opening: { type: "string" },
-          next_opening_type: { type: "string" },
-          opening_updated_at: { type: "string" },
-          water_label: { type: "string" },
-          water_value: { type: "string" },
-          water_time: { type: "string" },
-          wind_label: { type: "string" },
-          wind_speed: { type: "string" },
-          wind_direction: { type: "string" },
-          wind_time: { type: "string" },
-          notes: { type: "array", items: { type: "string" } },
-          sources: {
-            type: "array",
-            items: {
-              type: "object",
-              additionalProperties: false,
-              required: ["title", "url", "information_time"],
-              properties: {
-                title: { type: "string" },
-                url: { type: "string" },
-                information_time: { type: "string" }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
+let state = {
+  data: null,
+  lastSuccessAt: null,
+  lastAttemptAt: null,
+  error: null,
+  refreshing: null
 };
 
-const DASHBOARD_INSTRUCTION = `
-Je maakt live nautische dashboarddata voor zes Nederlandse bruggen. Zoek ALTIJD opnieuw op internet.
-
-BRONBELEID
-- Gebruik uitsluitend officiële bronnen binnen de toegestane domeinen.
-- Prioriteit: Vaarweginformatie.nl en actuele BAS/PIN-berichten voor bediening, stremming en werkzaamheden; Waterinfo Rijkswaterstaat voor waterstand; KNMI voor wind; daarna de officiële beheerder.
-- Gebruik geen commerciële waterkaarten, weerwebsites, nieuwsmedia, sociale media, Wikipedia of eigen geheugen.
-- Controleer publicatie-, meet- en geldigheidstijden. De meest recente officiële melding gaat voor een reguliere regeling.
-- Vermeld uitsluitend URLs die je werkelijk hebt geraadpleegd.
-
-PER BRUG
-1. Bepaal de actuele nautische status en de eerstvolgende toegestane brugbediening/openingsmogelijkheid NA de controletijd.
-2. Als de brug alleen op aanvraag wordt bediend en geen vast tijdstip officieel is vastgesteld, schrijf dan bijvoorbeeld "Op aanvraag" en verzin geen kloktijd.
-3. Als de brug is gestremd of niet wordt bediend, zet dit expliciet in status en next_opening.
-4. Maak onderscheid tussen beroepsvaart en recreatievaart wanneer de officiële regeling dat doet. Zet dit in notes.
-5. Waterstand: gebruik alleen een officiële verwachting voor het openingstijdstip als die beschikbaar is. Anders mag je de laatste officiële meting tonen, maar water_label moet dan letterlijk duidelijk maken dat dit NIET de stand op het openingstijdstip is. Niet interpoleren of zelf berekenen.
-6. Wind: gebruik alleen een officiële KNMI-verwachting voor de omgeving en het openingstijdstip. Als die niet betrouwbaar beschikbaar is, mag je een actuele officiële KNMI-meting tonen met een duidelijk label, of "Geen officiële live data". Gebruik geen andere weersbron.
-7. Laat elk niet-verifieerbaar veld als "Geen officiële live data" of "Niet officieel vast te stellen" staan. Nooit schatten.
-8. Gebruik absolute Nederlandse datum en tijd, bijvoorbeeld "2 augustus 2026, 20:30". Vermeld tijdzone Europe/Amsterdam.
-9. Houd status_text en notes kort en praktisch.
-
-De zes ids moeten exact één keer voorkomen: botlekbrug, spijkenisserbrug, alblasserdamsebrug, papendrechtsebrug, hartelbrug, wantijbrug.
-Geef uitsluitend JSON volgens het opgegeven schema.
-`;
-
-const QA_INSTRUCTION = `
-Je bent Brugwachter Live, een nauwkeurige Nederlandstalige nautische informatie-assistent.
-- Zoek bij iedere inhoudelijke vraag live op internet.
-- Gebruik uitsluitend officiële bronnen binnen de toegestane domeinen.
-- Beantwoord kort met opsommingstekens.
-- Vermeld status, object/locatie, datum/tijd, officiële bron en volledige bron-URL.
-- Geef de meest recente officiële melding voorrang en benoem tegenstrijdigheden.
-- Is actuele officiële informatie niet beschikbaar, zeg dat direct. Verzin of schat nooit gegevens.
-- Volg voor navigatie altijd officiële bebording, verkeersbegeleiding, marifoonberichten en aanwijzingen van de vaarwegbeheerder.
-`;
-
-const mimeTypes = {
-  ".html": "text/html; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".js": "application/javascript; charset=utf-8",
-  ".json": "application/json; charset=utf-8",
-  ".svg": "image/svg+xml",
-  ".ico": "image/x-icon"
-};
-
-const buckets = new Map();
-function isRateLimited(ip, route) {
-  const now = Date.now();
-  const windowMs = 60_000;
-  const maxRequests = route === "dashboard" ? 5 : 12;
-  const key = `${ip}:${route}`;
-  const recent = (buckets.get(key) || []).filter((time) => now - time < windowMs);
-  recent.push(now);
-  buckets.set(key, recent);
-  return recent.length > maxRequests;
+function decodeXml(value = "") {
+  return value
+    .replaceAll("&amp;", "&")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&apos;", "'")
+    .trim();
 }
 
-function sendJson(res, status, payload) {
-  res.writeHead(status, {
-    "Content-Type": "application/json; charset=utf-8",
-    "Cache-Control": "no-store",
-    "X-Content-Type-Options": "nosniff",
-    "X-Frame-Options": "DENY",
-    "Referrer-Policy": "strict-origin-when-cross-origin"
-  });
-  res.end(JSON.stringify(payload));
+function tagValue(xml, tag) {
+  const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(
+    `<(?:[\\w.-]+:)?${escaped}\\b[^>]*>([\\s\\S]*?)<\\/(?:[\\w.-]+:)?${escaped}>`,
+    "i"
+  );
+  const match = regex.exec(xml);
+  return match
+    ? decodeXml(match[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " "))
+    : null;
 }
 
-async function readBody(req) {
-  return new Promise((resolve, reject) => {
-    let data = "";
-    req.on("data", (chunk) => {
-      data += chunk;
-      if (data.length > 30_000) {
-        reject(new Error("Verzoek is te groot."));
-        req.destroy();
-      }
-    });
-    req.on("end", () => resolve(data));
-    req.on("error", reject);
-  });
+function attributeValue(openingTag, attribute) {
+  const escaped = attribute.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = new RegExp(
+    `${escaped}\\s*=\\s*["']([^"']+)["']`,
+    "i"
+  ).exec(openingTag);
+  return match ? decodeXml(match[1]) : null;
 }
 
-function isOfficialUrl(value) {
-  try {
-    const hostname = new URL(value).hostname.toLowerCase();
-    return OFFICIAL_DOMAINS.some((domain) => hostname === domain || hostname.endsWith(`.${domain}`));
-  } catch {
-    return false;
-  }
+function chunks(xml, element) {
+  const escaped = element.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(
+    `<(?:[\\w.-]+:)?${escaped}\\b[^>]*>[\\s\\S]*?<\\/(?:[\\w.-]+:)?${escaped}>`,
+    "gi"
+  );
+  return xml.match(regex) ?? [];
 }
 
-function getOutputText(response) {
-  if (typeof response.output_text === "string" && response.output_text.trim()) return response.output_text;
-  for (const item of response.output || []) {
-    if (item.type !== "message") continue;
-    for (const content of item.content || []) {
-      if (content.type === "output_text" && content.text) return content.text;
-    }
-  }
-  return "";
+function toIsoOrNull(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-function extractSources(response) {
-  const sourceMap = new Map();
-  for (const item of response.output || []) {
-    if (item.type !== "web_search_call") continue;
-    for (const source of item.action?.sources || []) {
-      if (source.url && isOfficialUrl(source.url)) {
-        sourceMap.set(source.url, { title: source.title || source.url, url: source.url });
-      }
-    }
-  }
-  return [...sourceMap.values()];
+function timestamp(value) {
+  if (!value) return null;
+  const ms = new Date(value).getTime();
+  return Number.isNaN(ms) ? null : ms;
 }
 
-function emptyBridge(bridge, message = "Geen verifieerbare live informatie ontvangen.") {
+function containsBridge(situationXml, bridge) {
+  return situationXml.toLowerCase().includes(bridge.isrs.toLowerCase());
+}
+
+function parseRecord(recordXml, situationXml) {
+  if (!/bridgeSwingInOperation/i.test(recordXml)) return null;
+
+  const openingTag =
+    recordXml.match(/<(?:[\w.-]+:)?situationRecord\b[^>]*>/i)?.[0] ?? "";
+  const situationTag =
+    situationXml.match(/<(?:[\w.-]+:)?situation\b[^>]*>/i)?.[0] ?? "";
+
   return {
-    ...bridge,
-    status: "onbekend",
-    status_text: message,
-    next_opening: "Niet officieel vast te stellen",
-    next_opening_type: "Geen officiële live data",
-    opening_updated_at: "",
-    water_label: "Geen officiële live data",
-    water_value: "—",
-    water_time: "",
-    wind_label: "Geen officiële live data",
-    wind_speed: "—",
-    wind_direction: "—",
-    wind_time: "",
-    notes: [],
-    sources: []
+    id:
+      attributeValue(openingTag, "id") ??
+      attributeValue(situationTag, "id"),
+    start: toIsoOrNull(tagValue(recordXml, "overallStartTime")),
+    end: toIsoOrNull(tagValue(recordXml, "overallEndTime")),
+    operatorActionStatus:
+      tagValue(recordXml, "operatorActionStatus") ?? "unknown",
+    probability:
+      tagValue(recordXml, "probabilityOfOccurrence") ?? "unknown",
+    ended:
+      /<(?:[\w.-]+:)?(?:end|cancel)\b[^>]*>\s*true\s*<\//i.test(
+        recordXml
+      ),
+    versionTime:
+      toIsoOrNull(tagValue(recordXml, "situationRecordVersionTime")) ??
+      toIsoOrNull(tagValue(situationXml, "situationVersionTime"))
   };
 }
 
-function normalizeDashboard(raw) {
-  const byId = new Map((Array.isArray(raw?.bridges) ? raw.bridges : []).map((item) => [item.id, item]));
+function durationMinutes(start, end) {
+  const startMs = timestamp(start);
+  const endMs = timestamp(end);
+  if (startMs === null || endMs === null || endMs < startMs) return null;
+  return Math.round((endMs - startMs) / 60000);
+}
+
+function selectEvent(records, nowMs) {
+  const usable = records.filter((record) => !record.ended && record.start);
+
+  const active = usable
+    .filter((record) => {
+      const startMs = timestamp(record.start);
+      const endMs = timestamp(record.end);
+      const activeStatus = ["beingImplemented", "implemented"].includes(
+        record.operatorActionStatus
+      );
+      return (
+        activeStatus &&
+        startMs !== null &&
+        startMs <= nowMs &&
+        (endMs === null || endMs > nowMs)
+      );
+    })
+    .sort((a, b) => timestamp(b.start) - timestamp(a.start))[0];
+
+  if (active) {
+    return {
+      status: "open",
+      statusLabel: "Nu open",
+      message: "De brugopening is volgens NDW momenteel actief.",
+      start: active.start,
+      end: active.end,
+      durationMinutes: durationMinutes(active.start, active.end),
+      operatorActionStatus: active.operatorActionStatus,
+      probability: active.probability,
+      eventId: active.id,
+      eventVersionTime: active.versionTime
+    };
+  }
+
+  const upcoming = usable
+    .filter((record) => {
+      const startMs = timestamp(record.start);
+      return startMs !== null && startMs > nowMs;
+    })
+    .sort((a, b) => timestamp(a.start) - timestamp(b.start))[0];
+
+  if (upcoming) {
+    const requested = upcoming.operatorActionStatus === "requested";
+    return {
+      status: requested ? "requested" : "expected",
+      statusLabel: requested ? "Aangevraagd" : "Gepland",
+      message: requested
+        ? "De opening is gemeld, maar nog niet als goedgekeurd aangeduid."
+        : "Dit is de eerstvolgende opening in de actuele NDW-planningsfeed.",
+      start: upcoming.start,
+      end: upcoming.end,
+      durationMinutes: durationMinutes(upcoming.start, upcoming.end),
+      operatorActionStatus: upcoming.operatorActionStatus,
+      probability: upcoming.probability,
+      eventId: upcoming.id,
+      eventVersionTime: upcoming.versionTime
+    };
+  }
+
+  return {
+    status: "none",
+    statusLabel: "Geen melding",
+    message:
+      "De huidige NDW-feed bevat geen actieve of toekomstige opening voor deze brug.",
+    start: null,
+    end: null,
+    durationMinutes: null,
+    operatorActionStatus: null,
+    probability: null,
+    eventId: null,
+    eventVersionTime: null
+  };
+}
+
+function parseNdwBridgeFeed(xml) {
+  if (typeof xml !== "string" || !xml.includes("<")) {
+    throw new TypeError("De NDW-feed bevat geen geldige XML.");
+  }
+
+  const nowMs = Date.now();
+  const publicationTime =
+    toIsoOrNull(tagValue(xml, "publicationTime")) ??
+    toIsoOrNull(tagValue(xml, "situationVersionTime"));
+  const situations = chunks(xml, "situation");
+
   const bridges = BRIDGES.map((bridge) => {
-    const item = byId.get(bridge.id);
-    if (!item) return emptyBridge(bridge);
+    const matchingSituations = situations.filter((situation) =>
+      containsBridge(situation, bridge)
+    );
+    const records = matchingSituations.flatMap((situation) =>
+      chunks(situation, "situationRecord")
+        .map((record) => parseRecord(record, situation))
+        .filter(Boolean)
+    );
 
-    const sources = (Array.isArray(item.sources) ? item.sources : [])
-      .filter((source) => source?.url && isOfficialUrl(source.url))
-      .map((source) => ({
-        title: String(source.title || "Officiële bron"),
-        url: String(source.url),
-        information_time: String(source.information_time || "")
-      }));
-
-    if (sources.length === 0) {
-      return emptyBridge(bridge, "Geen officiële bron-URL bij de live gegevens ontvangen.");
-    }
-
-    const allowedStatuses = new Set(["beschikbaar", "beperkt", "gestremd", "geen-bediening", "onbekend"]);
     return {
       ...bridge,
-      status: allowedStatuses.has(item.status) ? item.status : "onbekend",
-      status_text: String(item.status_text || "Geen officiële live data"),
-      next_opening: String(item.next_opening || "Niet officieel vast te stellen"),
-      next_opening_type: String(item.next_opening_type || "Geen officiële live data"),
-      opening_updated_at: String(item.opening_updated_at || ""),
-      water_label: String(item.water_label || "Geen officiële live data"),
-      water_value: String(item.water_value || "—"),
-      water_time: String(item.water_time || ""),
-      wind_label: String(item.wind_label || "Geen officiële live data"),
-      wind_speed: String(item.wind_speed || "—"),
-      wind_direction: String(item.wind_direction || "—"),
-      wind_time: String(item.wind_time || ""),
-      notes: (Array.isArray(item.notes) ? item.notes : []).map(String).slice(0, 5),
-      sources: sources.slice(0, 6)
+      sourceUrl: FEED_URL,
+      matchedSituations: matchingSituations.length,
+      ...selectEvent(records, nowMs)
     };
   });
 
   return {
-    checkedAt: new Date().toISOString(),
-    reportedCheckedAt: String(raw?.checked_at || ""),
-    summary: String(raw?.summary || "Live controle afgerond."),
+    source: "NDW Open Data · Planningsfeed Brugopeningen",
+    sourceUrl: FEED_URL,
+    publicationTime,
+    processedAt: new Date().toISOString(),
+    situationCount: situations.length,
     bridges
   };
 }
 
-async function callOpenAI({ input, instructions, schema = null }) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    const error = new Error("Live zoeken is nog niet geconfigureerd. Voeg OPENAI_API_KEY toe op de server.");
-    error.code = "NOT_CONFIGURED";
-    throw error;
-  }
-
-  const body = {
-    model,
-    reasoning: { effort: "medium" },
-    tools: [{
-      type: "web_search",
-      filters: { allowed_domains: OFFICIAL_DOMAINS }
-    }],
-    tool_choice: "required",
-    include: ["web_search_call.action.sources"],
-    instructions,
-    input,
-    max_output_tokens: 9000
-  };
-
-  if (schema) {
-    body.text = {
-      format: {
-        type: "json_schema",
-        name: "brugwachter_dashboard",
-        strict: true,
-        schema
-      }
-    };
-  }
-
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(body)
-  });
-
-  const raw = await response.text();
-  let data;
-  try {
-    data = JSON.parse(raw);
-  } catch {
-    throw new Error("De live zoekdienst gaf geen geldig antwoord.");
-  }
-
-  if (!response.ok) {
-    throw new Error(data?.error?.message || "De live zoekdienst is tijdelijk niet beschikbaar.");
-  }
-
-  return data;
+function decodeFeed(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const isGzip =
+    bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b;
+  return isGzip
+    ? gunzipSync(bytes).toString("utf8")
+    : Buffer.from(bytes).toString("utf8");
 }
 
-async function getDashboard() {
-  const now = new Date();
-  const bridgeList = BRIDGES.map((bridge) => `- ${bridge.id}: ${bridge.name}, ${bridge.waterway}, ${bridge.location}`).join("\n");
-  const response = await callOpenAI({
-    instructions: DASHBOARD_INSTRUCTION,
-    schema: DASHBOARD_SCHEMA,
-    input: `Controletijd UTC: ${now.toISOString()}\nLokale tijdzone: Europe/Amsterdam\n\nBruggen:\n${bridgeList}\n\nZoek de actuele officiële gegevens en maak het dashboard.`
-  });
+async function downloadFeed() {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-  const outputText = getOutputText(response);
-  if (!outputText) throw new Error("Er is geen gestructureerd live dashboard ontvangen.");
-
-  let parsed;
   try {
-    parsed = JSON.parse(outputText);
-  } catch {
-    throw new Error("Het live dashboard kon niet worden verwerkt.");
+    const response = await fetch(FEED_URL, {
+      signal: controller.signal,
+      headers: {
+        accept: "application/xml, application/gzip;q=0.9, */*;q=0.8",
+        "user-agent": "BrugwachterDashboard/2.0"
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`NDW antwoordde met HTTP ${response.status}`);
+    }
+
+    return decodeFeed(await response.arrayBuffer());
+  } finally {
+    clearTimeout(timer);
   }
+}
+
+async function refreshData({ force = false } = {}) {
+  const age = state.lastSuccessAt
+    ? Date.now() - new Date(state.lastSuccessAt).getTime()
+    : Infinity;
+
+  if (!force && state.data && age < REFRESH_INTERVAL_MS) return state.data;
+  if (state.refreshing) return state.refreshing;
+
+  state.refreshing = (async () => {
+    state.lastAttemptAt = new Date().toISOString();
+
+    try {
+      const xml = await downloadFeed();
+      state.data = parseNdwBridgeFeed(xml);
+      state.lastSuccessAt = new Date().toISOString();
+      state.error = null;
+      console.log(
+        `NDW-feed verwerkt: ${state.data.situationCount} situaties`
+      );
+      return state.data;
+    } catch (error) {
+      state.error = error instanceof Error ? error.message : String(error);
+      console.error("NDW-feed ophalen mislukt:", state.error);
+      if (!state.data) throw error;
+      return state.data;
+    } finally {
+      state.refreshing = null;
+    }
+  })();
+
+  return state.refreshing;
+}
+
+function json(res, statusCode, body) {
+  res.writeHead(statusCode, {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store",
+    "access-control-allow-origin": "*",
+    "x-content-type-options": "nosniff"
+  });
+  res.end(JSON.stringify(body));
+}
+
+function requestHasRefreshAccess(req, url) {
+  if (!REFRESH_SECRET) return false;
+  const bearer =
+    req.headers.authorization?.replace(/^Bearer\s+/i, "") ?? "";
+  const headerSecret = req.headers["x-refresh-secret"] ?? "";
+  const querySecret = url.searchParams.get("secret") ?? "";
+  return [bearer, headerSecret, querySecret].includes(REFRESH_SECRET);
+}
+
+function dashboardPayload() {
+  const staleMs = state.lastSuccessAt
+    ? Date.now() - new Date(state.lastSuccessAt).getTime()
+    : Infinity;
 
   return {
-    ...normalizeDashboard(parsed),
-    consultedSources: extractSources(response)
+    ok: Boolean(state.data),
+    stale: staleMs > REFRESH_INTERVAL_MS * 3,
+    lastSuccessAt: state.lastSuccessAt,
+    lastAttemptAt: state.lastAttemptAt,
+    error: state.error,
+    refreshIntervalSeconds: Math.round(REFRESH_INTERVAL_MS / 1000),
+    data: state.data
   };
 }
 
-async function askQuestion(question) {
-  const response = await callOpenAI({
-    instructions: QA_INSTRUCTION,
-    input: `Huidige controletijd: ${new Date().toISOString()}\nTijdzone: Europe/Amsterdam\nVraag: ${question}`
-  });
+const HTML = `<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Brugwachter Live</title>
+<meta name="description" content="Actuele en geplande brugopeningen uit de officiële NDW-planningsfeed.">
+<style>
+:root{
+  --bg:#eef3f6;--ink:#142b3a;--muted:#607582;--card:#fff;
+  --blue:#0b6674;--teal:#0d9b9c;--orange:#ef9b45;--red:#c84a45;
+  --line:#d8e2e7;--shadow:0 12px 35px rgba(28,53,68,.10)
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Arial,sans-serif}
+.hero{padding:42px 24px;background:linear-gradient(135deg,#102f43,#0b6271);color:#fff}
+.hero-inner{max-width:1180px;margin:auto}
+.eyebrow{font-weight:800;letter-spacing:.13em;text-transform:uppercase;font-size:.75rem;color:#86e1dd}
+h1{font-size:clamp(2rem,5vw,4.2rem);line-height:1.02;margin:.4rem 0 1rem;max-width:800px}
+.hero p{max-width:740px;margin:0;color:#d9ecef;font-size:1.05rem;line-height:1.6}
+main{max-width:1180px;margin:auto;padding:30px 20px 60px}
+.toolbar{display:flex;justify-content:space-between;gap:20px;align-items:end;margin-bottom:18px}
+.toolbar h2{margin:0;font-size:1.8rem}
+.meta{color:var(--muted);font-size:.9rem;margin-top:6px}
+button{border:0;border-radius:12px;background:var(--teal);color:white;font-weight:800;padding:12px 18px;cursor:pointer}
+button:disabled{opacity:.55;cursor:wait}
+.notice{padding:13px 16px;border-radius:12px;margin:0 0 18px;background:#fff5e8;border:1px solid #f3d3a8;color:#7c511f}
+.notice[hidden]{display:none}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:22px;box-shadow:var(--shadow)}
+.card-head{display:flex;justify-content:space-between;gap:14px;align-items:start}
+.card h3{margin:0;font-size:1.45rem}
+.subtitle{margin:.35rem 0 0;color:var(--muted)}
+.badge{font-size:.76rem;font-weight:900;text-transform:uppercase;letter-spacing:.06em;border-radius:999px;padding:7px 10px;background:#edf1f3;color:#52656f;white-space:nowrap}
+.card[data-status="open"] .badge{background:#ffe7e5;color:var(--red)}
+.card[data-status="expected"] .badge{background:#e3f4f2;color:#087572}
+.card[data-status="requested"] .badge{background:#fff0dc;color:#9a5a12}
+.opening{margin:20px 0;padding:18px;border-radius:15px;background:#123f55;color:#fff}
+.label{font-size:.75rem;text-transform:uppercase;letter-spacing:.09em;color:#a9d5df;font-weight:800}
+.time{font-size:1.5rem;font-weight:900;margin-top:7px}
+.detail{margin-top:6px;color:#d9edf1}
+.message{line-height:1.5;color:#425965;min-height:46px}
+.footer{display:flex;justify-content:space-between;gap:12px;align-items:center;border-top:1px solid var(--line);padding-top:14px;margin-top:14px;font-size:.8rem;color:var(--muted)}
+.footer a{color:var(--blue);font-weight:800}
+.loading{opacity:.6}
+@media(max-width:760px){
+  .grid{grid-template-columns:1fr}.toolbar{align-items:start;flex-direction:column}
+}
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner">
+    <div class="eyebrow">Brugwachter Live</div>
+    <h1>Wanneer is de volgende brugopening?</h1>
+    <p>Een actueel overzicht van zes bruggen, uitsluitend op basis van de officiële NDW-planningsfeed voor brugopeningen.</p>
+  </div>
+</header>
+<main>
+  <div class="toolbar">
+    <div>
+      <h2>Zes bruggen in één overzicht</h2>
+      <div class="meta" id="feedTime">Gegevens worden opgehaald…</div>
+    </div>
+    <button id="refresh">Nu vernieuwen</button>
+  </div>
+  <div class="notice" id="notice" hidden></div>
+  <section class="grid" id="cards"></section>
+</main>
+<script>
+const cards = document.querySelector("#cards");
+const notice = document.querySelector("#notice");
+const feedTime = document.querySelector("#feedTime");
+const refreshButton = document.querySelector("#refresh");
 
-  const text = getOutputText(response);
-  if (!text.trim()) throw new Error("Er is geen verifieerbaar live antwoord ontvangen.");
-  return { text, sources: extractSources(response) };
+const dateFormatter = new Intl.DateTimeFormat("nl-NL", {
+  timeZone:"Europe/Amsterdam",
+  weekday:"short",
+  day:"2-digit",
+  month:"short",
+  hour:"2-digit",
+  minute:"2-digit"
+});
+
+const timeFormatter = new Intl.DateTimeFormat("nl-NL", {
+  timeZone:"Europe/Amsterdam",
+  hour:"2-digit",
+  minute:"2-digit"
+});
+
+function formatDate(iso){
+  return iso ? dateFormatter.format(new Date(iso)).replace(" om "," · ") : "—";
 }
 
-async function serveStatic(req, res) {
-  const requestPath = new URL(req.url, `http://${req.headers.host}`).pathname;
-  const safePath = requestPath === "/" ? "/index.html" : requestPath;
-  const normalized = normalize(safePath).replace(/^(\.\.[/\\])+/, "");
-  const filePath = join(publicDir, normalized);
+function relativeTime(iso){
+  if(!iso) return "";
+  const seconds=Math.round((new Date(iso).getTime()-Date.now())/1000);
+  const abs=Math.abs(seconds);
+  const rtf=new Intl.RelativeTimeFormat("nl-NL",{numeric:"auto"});
+  if(abs<5400) return rtf.format(Math.round(seconds/60),"minute");
+  if(abs<129600) return rtf.format(Math.round(seconds/3600),"hour");
+  return rtf.format(Math.round(seconds/86400),"day");
+}
 
-  if (!filePath.startsWith(publicDir)) {
-    res.writeHead(403);
-    res.end("Verboden");
-    return;
+function presentation(bridge){
+  if(bridge.status==="open"){
+    return {
+      label:"Huidige status",
+      time:"NU OPEN",
+      detail:bridge.end ? "Tot ongeveer "+timeFormatter.format(new Date(bridge.end)) : "Eindtijd niet gemeld"
+    };
   }
+  if(bridge.start){
+    const duration=bridge.durationMinutes ? " · circa "+bridge.durationMinutes+" min" : "";
+    return {
+      label:"Volgende opening",
+      time:formatDate(bridge.start),
+      detail:relativeTime(bridge.start)+duration
+    };
+  }
+  return {
+    label:"Volgende opening",
+    time:"Niet gemeld",
+    detail:"Geen toekomstige opening in de huidige feed"
+  };
+}
 
-  try {
-    const file = await readFile(filePath);
-    res.writeHead(200, {
-      "Content-Type": mimeTypes[extname(filePath)] || "application/octet-stream",
-      "Cache-Control": extname(filePath) === ".html" ? "no-cache" : "public, max-age=3600",
-      "X-Content-Type-Options": "nosniff",
-      "X-Frame-Options": "DENY",
-      "Content-Security-Policy": "default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'self'; form-action 'self'"
-    });
-    res.end(file);
-  } catch {
-    res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
-    res.end("Pagina niet gevonden");
+function render(data){
+  cards.innerHTML="";
+  for(const bridge of data.bridges){
+    const p=presentation(bridge);
+    const card=document.createElement("article");
+    card.className="card";
+    card.dataset.status=bridge.status;
+    card.innerHTML=\`
+      <div class="card-head">
+        <div>
+          <h3>\${bridge.name}</h3>
+          <p class="subtitle">\${bridge.subtitle}</p>
+        </div>
+        <span class="badge">\${bridge.statusLabel}</span>
+      </div>
+      <div class="opening">
+        <div class="label">\${p.label}</div>
+        <div class="time">\${p.time}</div>
+        <div class="detail">\${p.detail}</div>
+      </div>
+      <div class="message">\${bridge.message}</div>
+      <div class="footer">
+        <span>ISRS \${bridge.isrs}</span>
+        <a href="\${bridge.sourceUrl}" target="_blank" rel="noopener">Officiële bron</a>
+      </div>
+    \`;
+    cards.appendChild(card);
   }
 }
+
+async function load(){
+  refreshButton.disabled=true;
+  cards.classList.add("loading");
+  try{
+    const response=await fetch("/api/dashboard",{cache:"no-store"});
+    const payload=await response.json();
+    if(!response.ok || !payload.data) throw new Error(payload.error || "Geen gegevens ontvangen.");
+    render(payload.data);
+    const stamp=payload.data.publicationTime || payload.lastSuccessAt;
+    feedTime.textContent=stamp ? "NDW bijgewerkt: "+formatDate(stamp) : "NDW-tijd onbekend";
+    if(payload.error){
+      notice.hidden=false;
+      notice.textContent="Nieuwe gegevens konden niet worden opgehaald. De laatste succesvolle gegevens worden getoond. "+payload.error;
+    }else if(payload.stale){
+      notice.hidden=false;
+      notice.textContent="De brongegevens zijn ouder dan verwacht.";
+    }else{
+      notice.hidden=true;
+    }
+  }catch(error){
+    notice.hidden=false;
+    notice.textContent=error.message || String(error);
+    feedTime.textContent="Gegevens niet beschikbaar";
+  }finally{
+    refreshButton.disabled=false;
+    cards.classList.remove("loading");
+  }
+}
+
+refreshButton.addEventListener("click",load);
+load();
+setInterval(load,60000);
+</script>
+</body>
+</html>`;
 
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host}`);
-  const ip = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
+  const url = new URL(
+    req.url || "/",
+    `http://${req.headers.host || "localhost"}`
+  );
 
-  if (req.method === "GET" && url.pathname === "/health") {
-    return sendJson(res, 200, {
-      status: "ok",
-      liveSearchConfigured: Boolean(process.env.OPENAI_API_KEY),
-      model,
-      checkedAt: new Date().toISOString()
+  try {
+    if (url.pathname === "/health") {
+      json(res, 200, {
+        status: "ok",
+        source: "NDW",
+        lastSuccessAt: state.lastSuccessAt,
+        error: state.error
+      });
+      return;
+    }
+
+    if (url.pathname === "/api/dashboard") {
+      await refreshData();
+      json(res, state.data ? 200 : 503, dashboardPayload());
+      return;
+    }
+
+    if (url.pathname === "/api/refresh") {
+      if (!requestHasRefreshAccess(req, url)) {
+        json(res, 403, {
+          ok: false,
+          error: REFRESH_SECRET
+            ? "Ongeldig refresh-geheim."
+            : "REFRESH_SECRET is niet ingesteld."
+        });
+        return;
+      }
+      await refreshData({ force: true });
+      json(res, state.data ? 200 : 503, dashboardPayload());
+      return;
+    }
+
+    if (url.pathname === "/" || url.pathname === "/index.html") {
+      res.writeHead(200, {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-cache",
+        "x-content-type-options": "nosniff"
+      });
+      res.end(HTML);
+      return;
+    }
+
+    if (url.pathname === "/favicon.ico") {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
+    res.writeHead(404, {
+      "content-type": "text/plain; charset=utf-8"
+    });
+    res.end("Niet gevonden");
+  } catch (error) {
+    json(res, 500, {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error)
     });
   }
-
-  if (req.method === "GET" && url.pathname === "/api/sources") {
-    return sendJson(res, 200, { domains: OFFICIAL_DOMAINS });
-  }
-
-  if (req.method === "GET" && url.pathname === "/api/dashboard") {
-    if (isRateLimited(ip, "dashboard")) {
-      return sendJson(res, 429, { error: "Te vaak vernieuwd. Probeer het over een minuut opnieuw.", checkedAt: new Date().toISOString() });
-    }
-    try {
-      return sendJson(res, 200, await getDashboard());
-    } catch (error) {
-      const status = error.code === "NOT_CONFIGURED" ? 503 : 502;
-      return sendJson(res, status, { error: error.message || "Live dashboard kon niet worden opgehaald.", checkedAt: new Date().toISOString() });
-    }
-  }
-
-  if (req.method === "POST" && url.pathname === "/api/ask") {
-    if (isRateLimited(ip, "ask")) {
-      return sendJson(res, 429, { error: "Te veel vragen. Probeer het over een minuut opnieuw." });
-    }
-
-    try {
-      const body = JSON.parse(await readBody(req));
-      const question = String(body.question || "").trim();
-      if (question.length < 3) return sendJson(res, 400, { error: "Vul een duidelijke vraag of locatie in." });
-      if (question.length > 800) return sendJson(res, 400, { error: "De vraag is te lang. Gebruik maximaal 800 tekens." });
-
-      const result = await askQuestion(question);
-      return sendJson(res, 200, { ...result, checkedAt: new Date().toISOString(), model });
-    } catch (error) {
-      const status = error.code === "NOT_CONFIGURED" ? 503 : 502;
-      return sendJson(res, status, { error: error.message || "Live informatie kon niet worden opgehaald.", checkedAt: new Date().toISOString() });
-    }
-  }
-
-  if (req.method !== "GET" && req.method !== "HEAD") {
-    return sendJson(res, 405, { error: "Methode niet toegestaan." });
-  }
-
-  return serveStatic(req, res);
 });
 
-server.listen(port, () => {
-  console.log(`Brugwachter Live draait op http://localhost:${port}`);
-  console.log(`Live zoeken: ${process.env.OPENAI_API_KEY ? "geconfigureerd" : "nog niet geconfigureerd"}`);
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`Brugwachter Live draait op poort ${PORT}`);
+  refreshData({ force: true }).catch(() => {});
 });
+
+const interval = setInterval(() => {
+  refreshData({ force: true }).catch(() => {});
+}, REFRESH_INTERVAL_MS);
+interval.unref();
