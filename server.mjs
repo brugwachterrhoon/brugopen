@@ -8,43 +8,62 @@ const FEED_URL =
 const REFRESH_INTERVAL_MS = Number(process.env.REFRESH_INTERVAL_MS || 300000);
 const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 20000);
 const REFRESH_SECRET = process.env.REFRESH_SECRET || "";
+const TIME_ZONE = "Europe/Amsterdam";
 
 const BRIDGES = [
   {
     id: "botlekbrug",
     name: "Botlekbrug",
-    subtitle: "Nieuwe Botlekbrug · A15",
-    isrs: "NLRTM001110888700281"
+    short: "A15 · Oude Maas",
+    isrs: "NLRTM001110888700281",
+    scheduleType: "botlek",
+    scheduleText: "Vaste tijden: :15 en :45 tussen 06:00–22:00. Werkdagen geen recreatievaart 06:30–09:30 en 15:30–18:30.",
+    scheduleSource: "https://www.rijkswaterstaat.nl/wegen/projectenoverzicht/a15-botlekbrug-nieuwe-verbinding-weg-en-goederenspoorverkeer-scheepvaart-en-bromfietsers/hinder-en-maatregelen/scheepvaart"
   },
   {
     id: "spijkenisserbrug",
     name: "Spijkenisserbrug",
-    subtitle: "S102 · Oude Maas",
-    isrs: "NLSPI001110572700266"
+    short: "S102 · Oude Maas",
+    isrs: "NLSPI001110572700266",
+    scheduleType: "spijkenisse",
+    scheduleText: "Vaste tijd: op het halve uur tussen 06:00–22:00. Werkdagen geen recreatievaart 06:30–09:30 en 15:30–18:30.",
+    scheduleSource: "https://www.rijkswaterstaat.nl/wegen/projectenoverzicht/a15-botlekbrug-nieuwe-verbinding-weg-en-goederenspoorverkeer-scheepvaart-en-bromfietsers/hinder-en-maatregelen/scheepvaart"
   },
   {
     id: "brug-over-de-noord",
     name: "Brug over de Noord",
-    subtitle: "Alblasserdamsebrug · N915",
-    isrs: "NLHIA001010577301210"
+    short: "Alblasserdamsebrug · N915",
+    isrs: "NLHIA001010577301210",
+    scheduleType: "alblasserdam",
+    scheduleText: "Zomer: dagelijks 10:00, 11:00, 12:00, 13:00, 14:00 en 16:00; weekend ook 09:00, 15:00 en 18:00; werkdagen 09:15 en 18:15.",
+    scheduleSource: "https://www.vaarweginformatie.nl/frp/geo/detail/BRIDGE/43523"
   },
   {
     id: "papendrechtsebrug",
     name: "Papendrechtsebrug",
-    subtitle: "Merwedebrug Papendrecht · N3",
-    isrs: "NLDOR001010577001143"
+    short: "Merwedebrug · N3",
+    isrs: "NLDOR001010577001143",
+    scheduleType: "papendrecht",
+    scheduleText: "Geen vaste bediening wegens renovatie. Een bijzondere maandelijkse opening kan alleen na aanmelding en wordt als concrete melding getoond.",
+    scheduleSource: "https://www.vaarweginformatie.nl/frp/geo/detail/BRIDGE/47519"
   },
   {
     id: "hartelbrug",
     name: "Hartelbrug",
-    subtitle: "N218 · Hartelkanaal",
-    isrs: "NLRTM0115B5487800010"
+    short: "N218 · Hartelkanaal",
+    isrs: "NLRTM0115B5487800010",
+    scheduleType: "hartel",
+    scheduleText: "24 uur op afroep, minimaal 2 uur vooraf. Werkdagen niet tijdens 06:45–08:30 en 16:00–18:30.",
+    scheduleSource: "https://www.vaarweginformatie.nl/"
   },
   {
     id: "wantijbrug",
     name: "Wantijbrug",
-    subtitle: "N3 · Dordrecht",
-    isrs: "NLDOR001100553200025"
+    short: "N3 · Dordrecht",
+    isrs: "NLDOR001100553200025",
+    scheduleType: "wantij",
+    scheduleText: "Zomer: werkdagen 09:30–15:30 en 18:30–22:00; weekend 09:30–22:00. Bediening bij aanvraag/aanbod.",
+    scheduleSource: "https://www.vaarweginformatie.nl/"
   }
 ];
 
@@ -55,6 +74,240 @@ let state = {
   error: null,
   refreshing: null
 };
+
+const zoneFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  weekday: "short",
+  hourCycle: "h23"
+});
+
+function zonedParts(date) {
+  const values = Object.fromEntries(
+    zoneFormatter
+      .formatToParts(date)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value])
+  );
+  return {
+    year: Number(values.year),
+    month: Number(values.month),
+    day: Number(values.day),
+    hour: Number(values.hour),
+    minute: Number(values.minute),
+    second: Number(values.second),
+    weekday: values.weekday
+  };
+}
+
+function timeZoneOffsetMs(date) {
+  const p = zonedParts(date);
+  const asUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+  return asUtc - date.getTime();
+}
+
+function localDateToUtc({ year, month, day, hour = 0, minute = 0, second = 0 }) {
+  const wallClock = Date.UTC(year, month - 1, day, hour, minute, second);
+  let result = wallClock - timeZoneOffsetMs(new Date(wallClock));
+  result = wallClock - timeZoneOffsetMs(new Date(result));
+  return new Date(result);
+}
+
+function addLocalDays(parts, days) {
+  const d = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + days));
+  return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() };
+}
+
+function dayOfWeek(localDate) {
+  return new Date(Date.UTC(localDate.year, localDate.month - 1, localDate.day)).getUTCDay();
+}
+
+function easterSunday(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return { year, month, day };
+}
+
+function dateKey(date) {
+  return `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
+}
+
+function shiftedDate(date, days) {
+  return addLocalDays(date, days);
+}
+
+function isDutchHoliday(date) {
+  const key = dateKey(date);
+  const easter = easterSunday(date.year);
+  const dates = new Set([
+    `${date.year}-01-01`,
+    `${date.year}-04-27`,
+    `${date.year}-05-05`,
+    `${date.year}-12-25`,
+    `${date.year}-12-26`,
+    dateKey(shiftedDate(easter, -2)),
+    dateKey(easter),
+    dateKey(shiftedDate(easter, 1)),
+    dateKey(shiftedDate(easter, 39)),
+    dateKey(shiftedDate(easter, 49)),
+    dateKey(shiftedDate(easter, 50))
+  ]);
+  return dates.has(key);
+}
+
+function isWeekendOrHoliday(date) {
+  const dow = dayOfWeek(date);
+  return dow === 0 || dow === 6 || isDutchHoliday(date);
+}
+
+function candidate(localDate, hour, minute) {
+  return localDateToUtc({ ...localDate, hour, minute, second: 0 });
+}
+
+function futureCandidates(now, builder, days = 14) {
+  const current = zonedParts(now);
+  const values = [];
+  for (let offset = 0; offset < days; offset += 1) {
+    const localDate = addLocalDays(current, offset);
+    for (const [hour, minute] of builder(localDate)) {
+      const instant = candidate(localDate, hour, minute);
+      if (instant.getTime() > now.getTime() + 15000) values.push(instant);
+    }
+  }
+  values.sort((a, b) => a - b);
+  return values;
+}
+
+function fixedQuarterTimes(localDate) {
+  const weekend = isWeekendOrHoliday(localDate);
+  const values = [];
+  for (let hour = 6; hour < 22; hour += 1) {
+    for (const minute of [15, 45]) {
+      if (!weekend) {
+        const total = hour * 60 + minute;
+        const morningBan = total >= 6 * 60 + 30 && total < 9 * 60 + 30;
+        const eveningBan = total >= 15 * 60 + 30 && total < 18 * 60 + 30;
+        if (morningBan || eveningBan) continue;
+      }
+      values.push([hour, minute]);
+    }
+  }
+  return values;
+}
+
+function spijkenisseTimes(localDate) {
+  const weekend = isWeekendOrHoliday(localDate);
+  const values = [];
+  for (let hour = 6; hour < 22; hour += 1) {
+    const minute = 30;
+    if (!weekend) {
+      const total = hour * 60 + minute;
+      const morningBan = total >= 6 * 60 + 30 && total < 9 * 60 + 30;
+      const eveningBan = total >= 15 * 60 + 30 && total < 18 * 60 + 30;
+      if (morningBan || eveningBan) continue;
+    }
+    values.push([hour, minute]);
+  }
+  return values;
+}
+
+function alblasserdamTimes(localDate) {
+  const summer = localDate.month >= 6 && localDate.month <= 10;
+  if (!summer) return [];
+  const weekend = isWeekendOrHoliday(localDate);
+  const base = [[10, 0], [11, 0], [12, 0], [13, 0], [14, 0], [16, 0]];
+  return weekend
+    ? [[9, 0], ...base, [15, 0], [18, 0]]
+    : [[9, 15], ...base, [18, 15]];
+}
+
+function nextWindowOpportunity(now, windowsBuilder, labelWhenOpen = "Nu binnen bedientijd") {
+  const current = zonedParts(now);
+  for (let offset = 0; offset < 14; offset += 1) {
+    const localDate = addLocalDays(current, offset);
+    const windows = windowsBuilder(localDate);
+    for (const [startHour, startMinute, endHour, endMinute] of windows) {
+      const start = candidate(localDate, startHour, startMinute);
+      const end = candidate(localDate, endHour, endMinute);
+      if (now >= start && now < end) {
+        return { instant: now, nowPossible: true, label: labelWhenOpen };
+      }
+      if (start > now) return { instant: start, nowPossible: false, label: "Volgende bedienmogelijkheid" };
+    }
+  }
+  return null;
+}
+
+function hartelOpportunity(now) {
+  const minimum = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+  const parts = zonedParts(minimum);
+  const localDate = { year: parts.year, month: parts.month, day: parts.day };
+  if (isWeekendOrHoliday(localDate)) {
+    return { instant: minimum, nowPossible: false, label: "Mogelijk na 2 uur voormelding" };
+  }
+  const total = parts.hour * 60 + parts.minute;
+  if (total >= 6 * 60 + 45 && total < 8 * 60 + 30) {
+    return { instant: candidate(localDate, 8, 30), nowPossible: false, label: "Na spits en 2 uur voormelding" };
+  }
+  if (total >= 16 * 60 && total < 18 * 60 + 30) {
+    return { instant: candidate(localDate, 18, 30), nowPossible: false, label: "Na spits en 2 uur voormelding" };
+  }
+  return { instant: minimum, nowPossible: false, label: "Mogelijk na 2 uur voormelding" };
+}
+
+function scheduleOpportunity(bridge, now = new Date()) {
+  if (bridge.scheduleType === "botlek") {
+    const instant = futureCandidates(now, fixedQuarterTimes)[0] ?? null;
+    return { instant, label: "Volgende vaste mogelijkheid", state: "fixed" };
+  }
+  if (bridge.scheduleType === "spijkenisse") {
+    const instant = futureCandidates(now, spijkenisseTimes)[0] ?? null;
+    return { instant, label: "Volgende vaste mogelijkheid", state: "fixed" };
+  }
+  if (bridge.scheduleType === "alblasserdam") {
+    const instant = futureCandidates(now, alblasserdamTimes, 370)[0] ?? null;
+    return {
+      instant,
+      label: instant ? "Volgende vaste mogelijkheid" : "Geen vaste zomertijd gevonden",
+      state: instant ? "fixed" : "none"
+    };
+  }
+  if (bridge.scheduleType === "papendrecht") {
+    return { instant: null, label: "Geen vaste bediening", state: "closed" };
+  }
+  if (bridge.scheduleType === "hartel") {
+    return { ...hartelOpportunity(now), state: "request" };
+  }
+  if (bridge.scheduleType === "wantij") {
+    const result = nextWindowOpportunity(now, (localDate) => {
+      const weekend = isWeekendOrHoliday(localDate);
+      return weekend
+        ? [[9, 30, 22, 0]]
+        : [[9, 30, 15, 30], [18, 30, 22, 0]];
+    }, "Nu mogelijk bij aanvraag/aanbod");
+    return result
+      ? { ...result, state: "window" }
+      : { instant: null, label: "Geen bedientijd gevonden", state: "none" };
+  }
+  return { instant: null, label: "Onbekend", state: "none" };
+}
 
 function decodeXml(value = "") {
   return value
@@ -80,10 +333,7 @@ function tagValue(xml, tag) {
 
 function attributeValue(openingTag, attribute) {
   const escaped = attribute.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = new RegExp(
-    `${escaped}\\s*=\\s*["']([^"']+)["']`,
-    "i"
-  ).exec(openingTag);
+  const match = new RegExp(`${escaped}\\s*=\\s*["']([^"']+)["']`, "i").exec(openingTag);
   return match ? decodeXml(match[1]) : null;
 }
 
@@ -114,110 +364,62 @@ function containsBridge(situationXml, bridge) {
 
 function parseRecord(recordXml, situationXml) {
   if (!/bridgeSwingInOperation/i.test(recordXml)) return null;
-
-  const openingTag =
-    recordXml.match(/<(?:[\w.-]+:)?situationRecord\b[^>]*>/i)?.[0] ?? "";
-  const situationTag =
-    situationXml.match(/<(?:[\w.-]+:)?situation\b[^>]*>/i)?.[0] ?? "";
-
+  const openingTag = recordXml.match(/<(?:[\w.-]+:)?situationRecord\b[^>]*>/i)?.[0] ?? "";
+  const situationTag = situationXml.match(/<(?:[\w.-]+:)?situation\b[^>]*>/i)?.[0] ?? "";
   return {
-    id:
-      attributeValue(openingTag, "id") ??
-      attributeValue(situationTag, "id"),
+    id: attributeValue(openingTag, "id") ?? attributeValue(situationTag, "id"),
     start: toIsoOrNull(tagValue(recordXml, "overallStartTime")),
     end: toIsoOrNull(tagValue(recordXml, "overallEndTime")),
-    operatorActionStatus:
-      tagValue(recordXml, "operatorActionStatus") ?? "unknown",
-    probability:
-      tagValue(recordXml, "probabilityOfOccurrence") ?? "unknown",
-    ended:
-      /<(?:[\w.-]+:)?(?:end|cancel)\b[^>]*>\s*true\s*<\//i.test(
-        recordXml
-      ),
+    operatorActionStatus: tagValue(recordXml, "operatorActionStatus") ?? "unknown",
+    probability: tagValue(recordXml, "probabilityOfOccurrence") ?? "unknown",
+    ended: /<(?:[\w.-]+:)?(?:end|cancel)\b[^>]*>\s*true\s*<\//i.test(recordXml),
     versionTime:
       toIsoOrNull(tagValue(recordXml, "situationRecordVersionTime")) ??
       toIsoOrNull(tagValue(situationXml, "situationVersionTime"))
   };
 }
 
-function durationMinutes(start, end) {
-  const startMs = timestamp(start);
-  const endMs = timestamp(end);
-  if (startMs === null || endMs === null || endMs < startMs) return null;
-  return Math.round((endMs - startMs) / 60000);
-}
-
 function selectEvent(records, nowMs) {
   const usable = records.filter((record) => !record.ended && record.start);
-
   const active = usable
     .filter((record) => {
       const startMs = timestamp(record.start);
       const endMs = timestamp(record.end);
-      const activeStatus = ["beingImplemented", "implemented"].includes(
-        record.operatorActionStatus
-      );
-      return (
-        activeStatus &&
-        startMs !== null &&
-        startMs <= nowMs &&
-        (endMs === null || endMs > nowMs)
-      );
+      const activeStatus = ["beingImplemented", "implemented"].includes(record.operatorActionStatus);
+      return activeStatus && startMs !== null && startMs <= nowMs && (endMs === null || endMs > nowMs);
     })
     .sort((a, b) => timestamp(b.start) - timestamp(a.start))[0];
 
   if (active) {
     return {
-      status: "open",
-      statusLabel: "Nu open",
-      message: "De brugopening is volgens NDW momenteel actief.",
-      start: active.start,
-      end: active.end,
-      durationMinutes: durationMinutes(active.start, active.end),
-      operatorActionStatus: active.operatorActionStatus,
-      probability: active.probability,
-      eventId: active.id,
-      eventVersionTime: active.versionTime
+      liveStatus: "open",
+      liveLabel: "NDW: NU OPEN",
+      liveStart: active.start,
+      liveEnd: active.end,
+      liveMessage: "Concrete opening actief volgens NDW."
     };
   }
 
   const upcoming = usable
-    .filter((record) => {
-      const startMs = timestamp(record.start);
-      return startMs !== null && startMs > nowMs;
-    })
+    .filter((record) => timestamp(record.start) > nowMs)
     .sort((a, b) => timestamp(a.start) - timestamp(b.start))[0];
 
   if (upcoming) {
-    const requested = upcoming.operatorActionStatus === "requested";
     return {
-      status: requested ? "requested" : "expected",
-      statusLabel: requested ? "Aangevraagd" : "Gepland",
-      message: requested
-        ? "De opening is gemeld, maar nog niet als goedgekeurd aangeduid."
-        : "Dit is de eerstvolgende opening in de actuele NDW-planningsfeed.",
-      start: upcoming.start,
-      end: upcoming.end,
-      durationMinutes: durationMinutes(upcoming.start, upcoming.end),
-      operatorActionStatus: upcoming.operatorActionStatus,
-      probability: upcoming.probability,
-      eventId: upcoming.id,
-      eventVersionTime: upcoming.versionTime
+      liveStatus: upcoming.operatorActionStatus === "requested" ? "requested" : "planned",
+      liveLabel: upcoming.operatorActionStatus === "requested" ? "NDW: AANGEVRAAGD" : "NDW: GEPLAND",
+      liveStart: upcoming.start,
+      liveEnd: upcoming.end,
+      liveMessage: "Concrete opening gemeld in de NDW-feed."
     };
   }
 
   return {
-    status: "none",
-    statusLabel: "Geen melding",
-    message:
-      "De huidige NDW-feed bevat geen actieve of toekomstige opening voor deze brug.",
-    start: null,
-    end: null,
-    durationMinutes: null,
-    operatorActionStatus: null,
-    probability: null,
-    eventId: null,
-    eventVersionTime: null
+    liveStatus: "none",
+    liveLabel: "NDW: GEEN MELDING",
+    liveStart: null,
+    liveEnd: null,
+    liveMessage: "Geen concrete opening gemeld."
   };
 }
 
@@ -225,28 +427,26 @@ function parseNdwBridgeFeed(xml) {
   if (typeof xml !== "string" || !xml.includes("<")) {
     throw new TypeError("De NDW-feed bevat geen geldige XML.");
   }
-
-  const nowMs = Date.now();
+  const now = new Date();
+  const situations = chunks(xml, "situation");
   const publicationTime =
     toIsoOrNull(tagValue(xml, "publicationTime")) ??
     toIsoOrNull(tagValue(xml, "situationVersionTime"));
-  const situations = chunks(xml, "situation");
 
   const bridges = BRIDGES.map((bridge) => {
-    const matchingSituations = situations.filter((situation) =>
-      containsBridge(situation, bridge)
-    );
+    const matchingSituations = situations.filter((situation) => containsBridge(situation, bridge));
     const records = matchingSituations.flatMap((situation) =>
       chunks(situation, "situationRecord")
         .map((record) => parseRecord(record, situation))
         .filter(Boolean)
     );
-
+    const opportunity = scheduleOpportunity(bridge, now);
     return {
       ...bridge,
-      sourceUrl: FEED_URL,
-      matchedSituations: matchingSituations.length,
-      ...selectEvent(records, nowMs)
+      nextOpportunity: opportunity.instant?.toISOString() ?? null,
+      opportunityLabel: opportunity.label,
+      opportunityState: opportunity.state,
+      ...selectEvent(records, now.getTime())
     };
   });
 
@@ -254,38 +454,53 @@ function parseNdwBridgeFeed(xml) {
     source: "NDW Open Data · Planningsfeed Brugopeningen",
     sourceUrl: FEED_URL,
     publicationTime,
-    processedAt: new Date().toISOString(),
-    situationCount: situations.length,
+    processedAt: now.toISOString(),
     bridges
+  };
+}
+
+function fallbackData() {
+  const now = new Date();
+  return {
+    source: "Vaste bedientijden; NDW tijdelijk niet bereikbaar",
+    sourceUrl: FEED_URL,
+    publicationTime: null,
+    processedAt: now.toISOString(),
+    bridges: BRIDGES.map((bridge) => {
+      const opportunity = scheduleOpportunity(bridge, now);
+      return {
+        ...bridge,
+        nextOpportunity: opportunity.instant?.toISOString() ?? null,
+        opportunityLabel: opportunity.label,
+        opportunityState: opportunity.state,
+        liveStatus: "unavailable",
+        liveLabel: "NDW: ONBEREIKBAAR",
+        liveStart: null,
+        liveEnd: null,
+        liveMessage: "Vaste bedientijden blijven zichtbaar."
+      };
+    })
   };
 }
 
 function decodeFeed(buffer) {
   const bytes = new Uint8Array(buffer);
-  const isGzip =
-    bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b;
-  return isGzip
-    ? gunzipSync(bytes).toString("utf8")
-    : Buffer.from(bytes).toString("utf8");
+  const isGzip = bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b;
+  return isGzip ? gunzipSync(bytes).toString("utf8") : Buffer.from(bytes).toString("utf8");
 }
 
 async function downloadFeed() {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
   try {
     const response = await fetch(FEED_URL, {
       signal: controller.signal,
       headers: {
         accept: "application/xml, application/gzip;q=0.9, */*;q=0.8",
-        "user-agent": "BrugwachterDashboard/2.0"
+        "user-agent": "BrugwachterDashboard/3.0"
       }
     });
-
-    if (!response.ok) {
-      throw new Error(`NDW antwoordde met HTTP ${response.status}`);
-    }
-
+    if (!response.ok) throw new Error(`NDW antwoordde met HTTP ${response.status}`);
     return decodeFeed(await response.arrayBuffer());
   } finally {
     clearTimeout(timer);
@@ -293,35 +508,26 @@ async function downloadFeed() {
 }
 
 async function refreshData({ force = false } = {}) {
-  const age = state.lastSuccessAt
-    ? Date.now() - new Date(state.lastSuccessAt).getTime()
-    : Infinity;
-
+  const age = state.lastSuccessAt ? Date.now() - new Date(state.lastSuccessAt).getTime() : Infinity;
   if (!force && state.data && age < REFRESH_INTERVAL_MS) return state.data;
   if (state.refreshing) return state.refreshing;
 
   state.refreshing = (async () => {
     state.lastAttemptAt = new Date().toISOString();
-
     try {
       const xml = await downloadFeed();
       state.data = parseNdwBridgeFeed(xml);
       state.lastSuccessAt = new Date().toISOString();
       state.error = null;
-      console.log(
-        `NDW-feed verwerkt: ${state.data.situationCount} situaties`
-      );
       return state.data;
     } catch (error) {
       state.error = error instanceof Error ? error.message : String(error);
-      console.error("NDW-feed ophalen mislukt:", state.error);
-      if (!state.data) throw error;
+      state.data = state.data ?? fallbackData();
       return state.data;
     } finally {
       state.refreshing = null;
     }
   })();
-
   return state.refreshing;
 }
 
@@ -337,260 +543,110 @@ function json(res, statusCode, body) {
 
 function requestHasRefreshAccess(req, url) {
   if (!REFRESH_SECRET) return false;
-  const bearer =
-    req.headers.authorization?.replace(/^Bearer\s+/i, "") ?? "";
+  const bearer = req.headers.authorization?.replace(/^Bearer\s+/i, "") ?? "";
   const headerSecret = req.headers["x-refresh-secret"] ?? "";
   const querySecret = url.searchParams.get("secret") ?? "";
   return [bearer, headerSecret, querySecret].includes(REFRESH_SECRET);
-}
-
-function dashboardPayload() {
-  const staleMs = state.lastSuccessAt
-    ? Date.now() - new Date(state.lastSuccessAt).getTime()
-    : Infinity;
-
-  return {
-    ok: Boolean(state.data),
-    stale: staleMs > REFRESH_INTERVAL_MS * 3,
-    lastSuccessAt: state.lastSuccessAt,
-    lastAttemptAt: state.lastAttemptAt,
-    error: state.error,
-    refreshIntervalSeconds: Math.round(REFRESH_INTERVAL_MS / 1000),
-    data: state.data
-  };
 }
 
 const HTML = `<!doctype html>
 <html lang="nl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>Brugwachter Live</title>
-<meta name="description" content="Actuele en geplande brugopeningen uit de officiële NDW-planningsfeed.">
 <style>
-:root{
-  --bg:#eef3f6;--ink:#142b3a;--muted:#607582;--card:#fff;
-  --blue:#0b6674;--teal:#0d9b9c;--orange:#ef9b45;--red:#c84a45;
-  --line:#d8e2e7;--shadow:0 12px 35px rgba(28,53,68,.10)
-}
+:root{--bg:#eaf0f3;--card:#fff;--ink:#153243;--muted:#607580;--line:#d8e3e8;--navy:#0d3e55;--teal:#087f82;--orange:#c96f13;--red:#b83d38;--shadow:0 6px 20px rgba(24,52,67,.10)}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Arial,sans-serif}
-.hero{padding:42px 24px;background:linear-gradient(135deg,#102f43,#0b6271);color:#fff}
-.hero-inner{max-width:1180px;margin:auto}
-.eyebrow{font-weight:800;letter-spacing:.13em;text-transform:uppercase;font-size:.75rem;color:#86e1dd}
-h1{font-size:clamp(2rem,5vw,4.2rem);line-height:1.02;margin:.4rem 0 1rem;max-width:800px}
-.hero p{max-width:740px;margin:0;color:#d9ecef;font-size:1.05rem;line-height:1.6}
-main{max-width:1180px;margin:auto;padding:30px 20px 60px}
-.toolbar{display:flex;justify-content:space-between;gap:20px;align-items:end;margin-bottom:18px}
-.toolbar h2{margin:0;font-size:1.8rem}
-.meta{color:var(--muted);font-size:.9rem;margin-top:6px}
-button{border:0;border-radius:12px;background:var(--teal);color:white;font-weight:800;padding:12px 18px;cursor:pointer}
-button:disabled{opacity:.55;cursor:wait}
-.notice{padding:13px 16px;border-radius:12px;margin:0 0 18px;background:#fff5e8;border:1px solid #f3d3a8;color:#7c511f}
-.notice[hidden]{display:none}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:22px;box-shadow:var(--shadow)}
-.card-head{display:flex;justify-content:space-between;gap:14px;align-items:start}
-.card h3{margin:0;font-size:1.45rem}
-.subtitle{margin:.35rem 0 0;color:var(--muted)}
-.badge{font-size:.76rem;font-weight:900;text-transform:uppercase;letter-spacing:.06em;border-radius:999px;padding:7px 10px;background:#edf1f3;color:#52656f;white-space:nowrap}
-.card[data-status="open"] .badge{background:#ffe7e5;color:var(--red)}
-.card[data-status="expected"] .badge{background:#e3f4f2;color:#087572}
-.card[data-status="requested"] .badge{background:#fff0dc;color:#9a5a12}
-.opening{margin:20px 0;padding:18px;border-radius:15px;background:#123f55;color:#fff}
-.label{font-size:.75rem;text-transform:uppercase;letter-spacing:.09em;color:#a9d5df;font-weight:800}
-.time{font-size:1.5rem;font-weight:900;margin-top:7px}
-.detail{margin-top:6px;color:#d9edf1}
-.message{line-height:1.5;color:#425965;min-height:46px}
-.footer{display:flex;justify-content:space-between;gap:12px;align-items:center;border-top:1px solid var(--line);padding-top:14px;margin-top:14px;font-size:.8rem;color:var(--muted)}
-.footer a{color:var(--blue);font-weight:800}
-.loading{opacity:.6}
-@media(max-width:760px){
-  .grid{grid-template-columns:1fr}.toolbar{align-items:start;flex-direction:column}
-}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:Arial,sans-serif;color:var(--ink)}
+main{height:100dvh;padding:10px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:10px}
+.card{min-height:0;background:var(--card);border:1px solid var(--line);border-radius:15px;box-shadow:var(--shadow);padding:13px;display:grid;grid-template-rows:auto auto auto 1fr auto;gap:7px;overflow:hidden}
+.top{display:flex;justify-content:space-between;align-items:start;gap:8px}
+h2{font-size:clamp(15px,1.5vw,22px);line-height:1.05;margin:0}.short{font-size:11px;color:var(--muted);margin-top:3px}.badge{font-size:9px;font-weight:900;letter-spacing:.04em;border-radius:999px;padding:5px 7px;background:#edf1f3;color:#566a74;white-space:nowrap}.card[data-live="open"] .badge{background:#ffe2df;color:var(--red)}.card[data-live="planned"] .badge,.card[data-live="requested"] .badge{background:#e0f3f1;color:#08716f}.card[data-live="unavailable"] .badge{background:#fff0dc;color:#8c561d}
+.next{background:var(--navy);color:#fff;border-radius:11px;padding:9px 11px}.next-label{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#a9dbe1;font-weight:800}.next-time{font-size:clamp(18px,2.2vw,29px);font-weight:900;line-height:1;margin-top:4px}.next-day{font-size:10px;color:#d9ebef;margin-top:4px}
+.schedule{font-size:11px;line-height:1.27;color:#344f5b;overflow:hidden}.live{font-size:10px;line-height:1.25;color:var(--muted);align-self:end}.live strong{color:var(--ink)}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-top:6px;border-top:1px solid var(--line);font-size:9px;color:var(--muted)}.foot a{color:var(--teal);font-weight:800;text-decoration:none}.status{position:fixed;right:13px;bottom:5px;font-size:8px;color:#78909b;background:rgba(234,240,243,.9);padding:2px 5px;border-radius:5px;pointer-events:none}
+@media(max-width:850px){main{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:6px;padding:6px}.card{padding:8px;gap:4px;border-radius:10px}.schedule{font-size:9px}.live{font-size:8px}.next{padding:7px}.next-time{font-size:17px}.badge{font-size:7px;padding:4px}.foot{font-size:7px}}
 </style>
 </head>
 <body>
-<header class="hero">
-  <div class="hero-inner">
-    <div class="eyebrow">Brugwachter Live</div>
-    <h1>Wanneer is de volgende brugopening?</h1>
-    <p>Een actueel overzicht van zes bruggen, uitsluitend op basis van de officiële NDW-planningsfeed voor brugopeningen.</p>
-  </div>
-</header>
-<main>
-  <div class="toolbar">
-    <div>
-      <h2>Zes bruggen in één overzicht</h2>
-      <div class="meta" id="feedTime">Gegevens worden opgehaald…</div>
-    </div>
-    <button id="refresh">Nu vernieuwen</button>
-  </div>
-  <div class="notice" id="notice" hidden></div>
-  <section class="grid" id="cards"></section>
-</main>
+<main id="cards"></main>
+<div class="status" id="status">laden…</div>
 <script>
-const cards = document.querySelector("#cards");
-const notice = document.querySelector("#notice");
-const feedTime = document.querySelector("#feedTime");
-const refreshButton = document.querySelector("#refresh");
-
-const dateFormatter = new Intl.DateTimeFormat("nl-NL", {
-  timeZone:"Europe/Amsterdam",
-  weekday:"short",
-  day:"2-digit",
-  month:"short",
-  hour:"2-digit",
-  minute:"2-digit"
-});
-
-const timeFormatter = new Intl.DateTimeFormat("nl-NL", {
-  timeZone:"Europe/Amsterdam",
-  hour:"2-digit",
-  minute:"2-digit"
-});
-
-function formatDate(iso){
-  return iso ? dateFormatter.format(new Date(iso)).replace(" om "," · ") : "—";
+const cards=document.querySelector('#cards');
+const statusEl=document.querySelector('#status');
+const dayFmt=new Intl.DateTimeFormat('nl-NL',{timeZone:'Europe/Amsterdam',weekday:'short',day:'2-digit',month:'short'});
+const timeFmt=new Intl.DateTimeFormat('nl-NL',{timeZone:'Europe/Amsterdam',hour:'2-digit',minute:'2-digit'});
+const stampFmt=new Intl.DateTimeFormat('nl-NL',{timeZone:'Europe/Amsterdam',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function opportunity(b){
+  if(!b.nextOpportunity)return {time:'Niet beschikbaar',day:b.opportunityLabel};
+  const d=new Date(b.nextOpportunity);
+  const diff=d.getTime()-Date.now();
+  if(b.opportunityState==='window'&&Math.abs(diff)<60000)return {time:'NU MOGELIJK',day:'Bij aanvraag of aanbod'};
+  return {time:timeFmt.format(d),day:dayFmt.format(d)+' · opening niet gegarandeerd'};
 }
-
-function relativeTime(iso){
-  if(!iso) return "";
-  const seconds=Math.round((new Date(iso).getTime()-Date.now())/1000);
-  const abs=Math.abs(seconds);
-  const rtf=new Intl.RelativeTimeFormat("nl-NL",{numeric:"auto"});
-  if(abs<5400) return rtf.format(Math.round(seconds/60),"minute");
-  if(abs<129600) return rtf.format(Math.round(seconds/3600),"hour");
-  return rtf.format(Math.round(seconds/86400),"day");
+function liveText(b){
+  if(b.liveStart){const d=new Date(b.liveStart);return '<strong>'+escapeHtml(b.liveLabel)+'</strong> · '+escapeHtml(dayFmt.format(d))+' '+escapeHtml(timeFmt.format(d));}
+  return '<strong>'+escapeHtml(b.liveLabel)+'</strong> · '+escapeHtml(b.liveMessage);
 }
-
-function presentation(bridge){
-  if(bridge.status==="open"){
-    return {
-      label:"Huidige status",
-      time:"NU OPEN",
-      detail:bridge.end ? "Tot ongeveer "+timeFormatter.format(new Date(bridge.end)) : "Eindtijd niet gemeld"
-    };
-  }
-  if(bridge.start){
-    const duration=bridge.durationMinutes ? " · circa "+bridge.durationMinutes+" min" : "";
-    return {
-      label:"Volgende opening",
-      time:formatDate(bridge.start),
-      detail:relativeTime(bridge.start)+duration
-    };
-  }
-  return {
-    label:"Volgende opening",
-    time:"Niet gemeld",
-    detail:"Geen toekomstige opening in de huidige feed"
-  };
-}
-
 function render(data){
-  cards.innerHTML="";
-  for(const bridge of data.bridges){
-    const p=presentation(bridge);
-    const card=document.createElement("article");
-    card.className="card";
-    card.dataset.status=bridge.status;
-    card.innerHTML=\`
-      <div class="card-head">
-        <div>
-          <h3>\${bridge.name}</h3>
-          <p class="subtitle">\${bridge.subtitle}</p>
-        </div>
-        <span class="badge">\${bridge.statusLabel}</span>
-      </div>
-      <div class="opening">
-        <div class="label">\${p.label}</div>
-        <div class="time">\${p.time}</div>
-        <div class="detail">\${p.detail}</div>
-      </div>
-      <div class="message">\${bridge.message}</div>
-      <div class="footer">
-        <span>ISRS \${bridge.isrs}</span>
-        <a href="\${bridge.sourceUrl}" target="_blank" rel="noopener">Officiële bron</a>
-      </div>
-    \`;
-    cards.appendChild(card);
+  cards.innerHTML='';
+  for(const b of data.bridges){
+    const o=opportunity(b);
+    const article=document.createElement('article');
+    article.className='card';article.dataset.live=b.liveStatus;
+    article.innerHTML=
+      '<div class="top"><div><h2>'+escapeHtml(b.name)+'</h2><div class="short">'+escapeHtml(b.short)+'</div></div><span class="badge">'+escapeHtml(b.liveLabel.replace('NDW: ',''))+'</span></div>'+
+      '<div class="next"><div class="next-label">'+escapeHtml(b.opportunityLabel)+'</div><div class="next-time">'+escapeHtml(o.time)+'</div><div class="next-day">'+escapeHtml(o.day)+'</div></div>'+
+      '<div class="schedule">'+escapeHtml(b.scheduleText)+'</div>'+
+      '<div class="live">'+liveText(b)+'</div>'+
+      '<div class="foot"><span>ISRS '+escapeHtml(b.isrs)+'</span><a href="'+escapeHtml(b.scheduleSource)+'" target="_blank" rel="noopener">bedientijden</a></div>';
+    cards.appendChild(article);
   }
 }
-
 async function load(){
-  refreshButton.disabled=true;
-  cards.classList.add("loading");
   try{
-    const response=await fetch("/api/dashboard",{cache:"no-store"});
+    const response=await fetch('/api/dashboard',{cache:'no-store'});
     const payload=await response.json();
-    if(!response.ok || !payload.data) throw new Error(payload.error || "Geen gegevens ontvangen.");
+    if(!payload.data)throw new Error(payload.error||'Geen gegevens');
     render(payload.data);
-    const stamp=payload.data.publicationTime || payload.lastSuccessAt;
-    feedTime.textContent=stamp ? "NDW bijgewerkt: "+formatDate(stamp) : "NDW-tijd onbekend";
-    if(payload.error){
-      notice.hidden=false;
-      notice.textContent="Nieuwe gegevens konden niet worden opgehaald. De laatste succesvolle gegevens worden getoond. "+payload.error;
-    }else if(payload.stale){
-      notice.hidden=false;
-      notice.textContent="De brongegevens zijn ouder dan verwacht.";
-    }else{
-      notice.hidden=true;
-    }
-  }catch(error){
-    notice.hidden=false;
-    notice.textContent=error.message || String(error);
-    feedTime.textContent="Gegevens niet beschikbaar";
-  }finally{
-    refreshButton.disabled=false;
-    cards.classList.remove("loading");
-  }
+    const stamp=payload.data.publicationTime||payload.lastSuccessAt||payload.data.processedAt;
+    statusEl.textContent=(payload.error?'laatste gegevens · ':'NDW · ')+(stamp?stampFmt.format(new Date(stamp)):'tijd onbekend');
+  }catch(error){statusEl.textContent='fout: '+(error.message||error);}
 }
-
-refreshButton.addEventListener("click",load);
-load();
-setInterval(load,60000);
+load();setInterval(load,60000);
 </script>
 </body>
 </html>`;
 
 const server = http.createServer(async (req, res) => {
-  const url = new URL(
-    req.url || "/",
-    `http://${req.headers.host || "localhost"}`
-  );
-
+  const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
   try {
     if (url.pathname === "/health") {
+      json(res, 200, { status: "ok", lastSuccessAt: state.lastSuccessAt, error: state.error });
+      return;
+    }
+    if (url.pathname === "/api/dashboard") {
+      await refreshData();
       json(res, 200, {
-        status: "ok",
-        source: "NDW",
+        ok: true,
         lastSuccessAt: state.lastSuccessAt,
-        error: state.error
+        lastAttemptAt: state.lastAttemptAt,
+        error: state.error,
+        data: state.data
       });
       return;
     }
-
-    if (url.pathname === "/api/dashboard") {
-      await refreshData();
-      json(res, state.data ? 200 : 503, dashboardPayload());
-      return;
-    }
-
     if (url.pathname === "/api/refresh") {
       if (!requestHasRefreshAccess(req, url)) {
-        json(res, 403, {
-          ok: false,
-          error: REFRESH_SECRET
-            ? "Ongeldig refresh-geheim."
-            : "REFRESH_SECRET is niet ingesteld."
-        });
+        json(res, 403, { ok: false, error: "Ongeldig refresh-geheim." });
         return;
       }
       await refreshData({ force: true });
-      json(res, state.data ? 200 : 503, dashboardPayload());
+      json(res, 200, { ok: true, error: state.error, data: state.data });
       return;
     }
-
     if (url.pathname === "/" || url.pathname === "/index.html") {
       res.writeHead(200, {
         "content-type": "text/html; charset=utf-8",
@@ -600,22 +656,15 @@ const server = http.createServer(async (req, res) => {
       res.end(HTML);
       return;
     }
-
     if (url.pathname === "/favicon.ico") {
       res.writeHead(204);
       res.end();
       return;
     }
-
-    res.writeHead(404, {
-      "content-type": "text/plain; charset=utf-8"
-    });
+    res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
     res.end("Niet gevonden");
   } catch (error) {
-    json(res, 500, {
-      ok: false,
-      error: error instanceof Error ? error.message : String(error)
-    });
+    json(res, 500, { ok: false, error: error instanceof Error ? error.message : String(error) });
   }
 });
 
