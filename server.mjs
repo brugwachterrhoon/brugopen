@@ -21,7 +21,7 @@ const BRIDGES = [
     short: "A15 · Oude Maas",
     isrs: "NLRTM001110888700281",
     scheduleType: "botlek",
-    waterLocations: ["botlek.oudemaas.botlekbrug", "botlek.oudemaas"],
+    waterLocations: ["botlek.oudemaas.botlekbrug", "botlek.oudemaas", "hoogvliet", "spijkenisse.oudemaas.brug", "spijkenisse.oudemaas"],
     waterLocationLabel: "Botlek Oude Maas",
     scheduleText: "Vaste tijden: :15 en :45 tussen 06:00–22:00. Werkdagen geen recreatievaart 06:30–09:30 en 15:30–18:30.",
     scheduleSource: "https://www.rijkswaterstaat.nl/wegen/projectenoverzicht/a15-botlekbrug-nieuwe-verbinding-weg-en-goederenspoorverkeer-scheepvaart-en-bromfietsers/hinder-en-maatregelen/scheepvaart"
@@ -667,7 +667,7 @@ function waterForBridge(bridge, measurements) {
       waterLevelMetres: measurement.valueMetres,
       waterMeasuredAt: measurement.measuredAt,
       waterLocationCode: measurement.locationCode,
-      waterLocationName: bridge.waterLocationLabel,
+      waterLocationName: measurement.locationName || bridge.waterLocationLabel,
       waterStatus: ageMs > 6 * 60 * 60 * 1000 ? "stale" : "current",
       waterMessage: ageMs > 6 * 60 * 60 * 1000 ? "Laatste meting is ouder dan 6 uur" : "Actuele RWS-meting",
       waterSourceUrl: WATER_SOURCE_URL
