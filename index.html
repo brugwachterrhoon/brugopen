@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Live overzicht van de volgende toegestane brugopeningen, waterstanden en wind voor zes bruggen in Zuid-Holland.">
+  <title>Brugwachter Live Dashboard</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="Brugwachter Live startpagina">
+      <span class="brand-icon" aria-hidden="true">
+        <svg viewBox="0 0 64 64"><path d="M7 43h50M13 43V25h9l10 11 10-11h9v18M22 25l10-10 10 10M15 51c5 4 9 4 14 0 5 4 9 4 14 0 5 4 9 4 14 0"/></svg>
+      </span>
+      <span><strong>Brugwachter</strong><small>LIVE OPENINGSOVERZICHT</small></span>
+    </a>
+    <div class="header-actions">
+      <span class="clock" id="clock">--:--:--</span>
+      <span class="live-indicator" id="liveIndicator"><i></i><span>Status controleren</span></span>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Zuid-Holland · officiële live bronnen</p>
+        <h1>Wanneer is de<br><em>volgende brugopening?</em></h1>
+        <p>Een actueel overzicht van zes bruggen met bediening, waterstand en wind. Niet officieel bevestigd betekent: niet tonen als feit.</p>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <div class="moon"></div><div class="tower left"></div><div class="tower right"></div>
+        <div class="deck deck-left"></div><div class="deck deck-right"></div>
+        <div class="ship"><i></i></div><div class="waves"></div>
+      </div>
+    </section>
+
+    <section class="dashboard-section" aria-labelledby="dashboardTitle">
+      <div class="dashboard-toolbar">
+        <div>
+          <p class="eyebrow">Live dashboard</p>
+          <h2 id="dashboardTitle">Zes bruggen in één overzicht</h2>
+          <p class="last-check" id="lastCheck">Nog niet live gecontroleerd</p>
+        </div>
+        <div class="refresh-area">
+          <span id="nextRefresh">Automatisch vernieuwen: na live controle</span>
+          <button id="refreshButton" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5M4 18v-5h5M18.5 9A7 7 0 0 0 6.4 6.4L4 9m16 6-2.4 2.6A7 7 0 0 1 5.5 15"/></svg>
+            Nu vernieuwen
+          </button>
+        </div>
+      </div>
+
+      <div class="dashboard-message" id="dashboardMessage" hidden></div>
+
+      <div class="bridge-grid" id="bridgeGrid">
+        <article class="bridge-card" data-bridge="botlekbrug">
+          <div class="card-top"><div><span class="waterway">Oude Maas</span><h3>Botlekbrug</h3><p>Rotterdam / Hoogvliet</p></div><span class="status unknown">Wachten</span></div>
+          <div class="opening"><small>Volgende toegestane opening</small><strong class="next-opening">Live controle nodig</strong><span class="opening-type">Nog niet officieel gecontroleerd</span></div>
+          <div class="conditions"><div><span class="metric-icon water-icon">≈</span><small class="water-label">Waterstand</small><strong class="water-value">—</strong><em class="water-time"></em></div><div><span class="metric-icon wind-icon">↗</span><small class="wind-label">Wind</small><strong><span class="wind-speed">—</span> <span class="wind-direction"></span></strong><em class="wind-time"></em></div></div>
+          <ul class="notes"></ul><div class="card-sources"></div><p class="card-update"></p>
+        </article>
+        <article class="bridge-card" data-bridge="spijkenisserbrug">
+          <div class="card-top"><div><span class="waterway">Oude Maas</span><h3>Spijkenisserbrug</h3><p>Spijkenisse / Hoogvliet</p></div><span class="status unknown">Wachten</span></div>
+          <div class="opening"><small>Volgende toegestane opening</small><strong class="next-opening">Live controle nodig</strong><span class="opening-type">Nog niet officieel gecontroleerd</span></div>
+          <div class="conditions"><div><span class="metric-icon water-icon">≈</span><small class="water-label">Waterstand</small><strong class="water-value">—</strong><em class="water-time"></em></div><div><span class="metric-icon wind-icon">↗</span><small class="wind-label">Wind</small><strong><span class="wind-speed">—</span> <span class="wind-direction"></span></strong><em class="wind-time"></em></div></div>
+          <ul class="notes"></ul><div class="card-sources"></div><p class="card-update"></p>
+        </article>
+        <article class="bridge-card" data-bridge="alblasserdamsebrug">
+          <div class="card-top"><div><span class="waterway">De Noord</span><h3>Alblasserdamsebrug</h3><p>Alblasserdam / Hendrik-Ido-Ambacht</p></div><span class="status unknown">Wachten</span></div>
+          <div class="opening"><small>Volgende toegestane opening</small><strong class="next-opening">Live controle nodig</strong><span class="opening-type">Nog niet officieel gecontroleerd</span></div>
+          <div class="conditions"><div><span class="metric-icon water-icon">≈</span><small class="water-label">Waterstand</small><strong class="water-value">—</strong><em class="water-time"></em></div><div><span class="metric-icon wind-icon">↗</span><small class="wind-label">Wind</small><strong><span class="wind-speed">—</span> <span class="wind-direction"></span></strong><em class="wind-time"></em></div></div>
+          <ul class="notes"></ul><div class="card-sources"></div><p class="card-update"></p>
+        </article>
+        <article class="bridge-card" data-bridge="papendrechtsebrug">
+          <div class="card-top"><div><span class="waterway">Beneden-Merwede</span><h3>Papendrechtsebrug</h3><p>Papendrecht / Dordrecht</p></div><span class="status unknown">Wachten</span></div>
+          <div class="opening"><small>Volgende toegestane opening</small><strong class="next-opening">Live controle nodig</strong><span class="opening-type">Nog niet officieel gecontroleerd</span></div>
+          <div class="conditions"><div><span class="metric-icon water-icon">≈</span><small class="water-label">Waterstand</small><strong class="water-value">—</strong><em class="water-time"></em></div><div><span class="metric-icon wind-icon">↗</span><small class="wind-label">Wind</small><strong><span class="wind-speed">—</span> <span class="wind-direction"></span></strong><em class="wind-time"></em></div></div>
+          <ul class="notes"></ul><div class="card-sources"></div><p class="card-update"></p>
+        </article>
+        <article class="bridge-card" data-bridge="hartelbrug">
+          <div class="card-top"><div><span class="waterway">Hartelkanaal</span><h3>Hartelbrug</h3><p>Spijkenisse / Botlek</p></div><span class="status unknown">Wachten</span></div>
+          <div class="opening"><small>Volgende toegestane opening</small><strong class="next-opening">Live controle nodig</strong><span class="opening-type">Nog niet officieel gecontroleerd</span></div>
+          <div class="conditions"><div><span class="metric-icon water-icon">≈</span><small class="water-label">Waterstand</small><strong class="water-value">—</strong><em class="water-time"></em></div><div><span class="metric-icon wind-icon">↗</span><small class="wind-label">Wind</small><strong><span class="wind-speed">—</span> <span class="wind-direction"></span></strong><em class="wind-time"></em></div></div>
+          <ul class="notes"></ul><div class="card-sources"></div><p class="card-update"></p>
+        </article>
+        <article class="bridge-card" data-bridge="wantijbrug">
+          <div class="card-top"><div><span class="waterway">Wantij</span><h3>Wantijbrug</h3><p>Dordrecht</p></div><span class="status unknown">Wachten</span></div>
+          <div class="opening"><small>Volgende toegestane opening</small><strong class="next-opening">Live controle nodig</strong><span class="opening-type">Nog niet officieel gecontroleerd</span></div>
+          <div class="conditions"><div><span class="metric-icon water-icon">≈</span><small class="water-label">Waterstand</small><strong class="water-value">—</strong><em class="water-time"></em></div><div><span class="metric-icon wind-icon">↗</span><small class="wind-label">Wind</small><strong><span class="wind-speed">—</span> <span class="wind-direction"></span></strong><em class="wind-time"></em></div></div>
+          <ul class="notes"></ul><div class="card-sources"></div><p class="card-update"></p>
+        </article>
+      </div>
+    </section>
+
+    <section class="assistant-section" aria-labelledby="assistantTitle">
+      <div class="assistant-copy">
+        <p class="eyebrow">Extra live controle</p>
+        <h2 id="assistantTitle">Vraag de brugwachter</h2>
+        <p>Vraag naar een stremming, werkzaamheid, waterstand, BAS-bericht of PIN-bericht. De assistent zoekt bij iedere vraag opnieuw.</p>
+      </div>
+      <div class="assistant-panel">
+        <form id="questionForm">
+          <label for="question">Uw vraag</label>
+          <div class="question-box">
+            <input id="question" type="text" maxlength="800" placeholder="Bijv. Welke BAS-berichten gelden nu voor de Botlekbrug?" required>
+            <button id="submitButton" type="submit">Live zoeken</button>
+          </div>
+        </form>
+        <div class="loading" id="loading" hidden><i></i><span>Officiële bronnen worden live gecontroleerd…</span></div>
+        <div class="answer-panel" id="result" hidden>
+          <p id="resultTime"></p><div id="answer"></div><div id="resultSources"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="source-policy">
+      <div><p class="eyebrow">Bronbeleid</p><h2>Geen bevestiging, geen feit</h2><p>De site gebruikt alleen actuele informatie van officiële overheden en vaarwegbeheerders. Bij ontbrekende prognoses wordt geen waterstand of wind voor het openingstijdstip berekend.</p></div>
+      <div class="official-links">
+        <a href="https://vaarweginformatie.nl/" target="_blank" rel="noopener noreferrer"><strong>Vaarweginformatie</strong><span>Bediening en scheepvaartberichten ↗</span></a>
+        <a href="https://waterinfo.rws.nl/" target="_blank" rel="noopener noreferrer"><strong>Waterinfo</strong><span>Waterstanden en verwachtingen ↗</span></a>
+        <a href="https://www.knmi.nl/nederland-nu/weer/waarnemingen" target="_blank" rel="noopener noreferrer"><strong>KNMI</strong><span>Officiële windinformatie ↗</span></a>
+        <a href="https://pin.portofrotterdam.com/" target="_blank" rel="noopener noreferrer"><strong>Haven Rotterdam</strong><span>PIN- en nautische berichten ↗</span></a>
+      </div>
+    </section>
+
+    <aside class="safety-note"><strong>Navigatieveiligheid:</strong> dit dashboard is een informatiehulpmiddel. Volg altijd de actuele seinen, marifooninstructies, verkeersbegeleiding en aanwijzingen van de bevoegde vaarwegbeheerder.</aside>
+  </main>
+
+  <footer><span>Brugwachter Live · <span id="year"></span></span><span>Automatische controle iedere 5 minuten</span></footer>
+  <script src="/app.js" defer></script>
+</body>
+</html>

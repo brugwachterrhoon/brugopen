@@ -1,0 +1,12 @@
+{
+  "name": "brugwachter-live-dashboard",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Live dashboard voor zes bruggen met officiële openings-, waterstands- en windinformatie.",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node --watch server.mjs"
+  },
+  "engines": { "node": ">=20" }
+}
