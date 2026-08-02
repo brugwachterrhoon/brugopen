@@ -9,6 +9,9 @@ const WATER_API_URL =
   process.env.RWS_WATER_API_URL ||
   "https://ddapi20-waterwebservices.rijkswaterstaat.nl/ONLINEWAARNEMINGENSERVICES/OphalenLaatsteWaarnemingen";
 const WATER_SOURCE_URL = "https://waterinfo.rws.nl/";
+const WIND_WFS_URL =
+  process.env.RWS_WIND_WFS_URL ||
+  "https://geo.rijkswaterstaat.nl/services/ogc/hws/DDAPI20/ows";
 const REFRESH_INTERVAL_MS = Number(process.env.REFRESH_INTERVAL_MS || 300000);
 const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 20000);
 const REFRESH_SECRET = process.env.REFRESH_SECRET || "";
@@ -65,6 +68,8 @@ const BRIDGES = [
     short: "A15 · Oude Maas",
     isrs: "NLRTM001110888700281",
     scheduleType: "botlek",
+    latitude: 51.867,
+    longitude: 4.3428,
     waterLocations: ["botlek.oudemaas.botlekbrug", "botlek.oudemaas", "hoogvliet", "spijkenisse.oudemaas.brug", "spijkenisse.oudemaas"],
     waterLocationLabel: "Botlek Oude Maas",
     scheduleText: "Vaste tijden: :15 en :45 tussen 06:00–22:00. Werkdagen geen recreatievaart 06:30–09:30 en 15:30–18:30.",
@@ -76,6 +81,8 @@ const BRIDGES = [
     short: "S102 · Oude Maas",
     isrs: "NLSPI001110572700266",
     scheduleType: "spijkenisse",
+    latitude: 51.845,
+    longitude: 4.331,
     waterLocations: ["spijkenisse.oudemaas.brug", "spijkenisse.oudemaas"],
     waterLocationLabel: "Spijkenisse Oude Maas",
     scheduleText: "Vaste tijd: op het halve uur tussen 06:00–22:00. Werkdagen geen recreatievaart 06:30–09:30 en 15:30–18:30.",
@@ -87,6 +94,8 @@ const BRIDGES = [
     short: "Alblasserdamsebrug · N915",
     isrs: "NLHIA001010577301210",
     scheduleType: "alblasserdam",
+    latitude: 51.8544,
+    longitude: 4.6586,
     waterLocations: ["alblasserdam"],
     waterLocationLabel: "Alblasserdam",
     scheduleText: "Zomer: dagelijks 10:00, 11:00, 12:00, 13:00, 14:00 en 16:00; weekend ook 09:00, 15:00 en 18:00; werkdagen 09:15 en 18:15.",
@@ -98,6 +107,8 @@ const BRIDGES = [
     short: "Merwedebrug · N3",
     isrs: "NLDOR001010577001143",
     scheduleType: "papendrecht",
+    latitude: 51.8174,
+    longitude: 4.7041,
     waterLocations: ["papendrecht", "papendrecht.benedenmerwede", "dordrecht.oudemaas.benedenmerwede"],
     waterLocationLabel: "Beneden Merwede nabij Papendrecht",
     scheduleText: "Geen vaste bediening wegens renovatie. Een bijzondere maandelijkse opening kan alleen na aanmelding en wordt als concrete melding getoond.",
@@ -109,6 +120,8 @@ const BRIDGES = [
     short: "N218 · Hartelkanaal",
     isrs: "NLRTM0115B5487800010",
     scheduleType: "hartel",
+    latitude: 51.8756,
+    longitude: 4.2258,
     waterLocations: ["europoort.hartelbrug", "hartelkanaal.vak81", "botlek.hartelkering.binnen"],
     waterLocationLabel: "Hartelkanaal bij Hartelbrug",
     scheduleText: "24 uur op afroep, minimaal 2 uur vooraf. Werkdagen niet tijdens 06:45–08:30 en 16:00–18:30.",
@@ -120,6 +133,8 @@ const BRIDGES = [
     short: "N3 · Dordrecht",
     isrs: "NLDOR001100553200025",
     scheduleType: "wantij",
+    latitude: 51.8087,
+    longitude: 4.6915,
     waterLocations: ["dordrecht.wantij", "dordrecht.wantij.west", "dordrecht.oudemaas.benedenmerwede"],
     waterLocationLabel: "Wantij nabij Dordrecht",
     scheduleText: "Zomer: werkdagen 09:30–15:30 en 18:30–22:00; weekend 09:30–22:00. Bediening bij aanvraag/aanbod.",
@@ -809,18 +824,6 @@ async function downloadEnvironmentalData() {
               Compartiment: { Code: "OW" },
               Grootheid: { Code: "WATHTE" }
             }
-          },
-          {
-            AquoMetadata: {
-              Compartiment: { Code: "LT" },
-              Grootheid: { Code: "WINDSHD" }
-            }
-          },
-          {
-            AquoMetadata: {
-              Compartiment: { Code: "LT" },
-              Grootheid: { Code: "WINDRTG" }
-            }
           }
         ]
       })
@@ -893,6 +896,206 @@ function mergeWaterData(data, measurements, previousData = null) {
   };
 }
 
+
+function parseDelimited(text) {
+  const firstLine = String(text).split(/\r?\n/, 1)[0] ?? "";
+  const delimiter = (firstLine.match(/;/g) ?? []).length >= (firstLine.match(/,/g) ?? []).length ? ";" : ",";
+  const rows = [];
+  let row = [];
+  let field = "";
+  let quoted = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (quoted) {
+      if (char === '"' && text[index + 1] === '"') {
+        field += '"';
+        index += 1;
+      } else if (char === '"') {
+        quoted = false;
+      } else {
+        field += char;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      quoted = true;
+    } else if (char === delimiter) {
+      row.push(field);
+      field = "";
+    } else if (char === "\n") {
+      row.push(field.replace(/\r$/, ""));
+      if (row.some((value) => value !== "")) rows.push(row);
+      row = [];
+      field = "";
+    } else {
+      field += char;
+    }
+  }
+
+  if (field || row.length) {
+    row.push(field.replace(/\r$/, ""));
+    if (row.some((value) => value !== "")) rows.push(row);
+  }
+  return rows;
+}
+
+function normalizedHeader(value) {
+  return String(value ?? "")
+    .replace(/^\uFEFF/, "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function rowValue(row, names) {
+  for (const name of names) {
+    const value = row[normalizedHeader(name)];
+    if (value !== undefined && value !== null && value !== "") return value;
+  }
+  return null;
+}
+
+function geometryLatLon(value) {
+  const match = /POINT(?:\s+Z)?\s*\(\s*([-+0-9.eE]+)\s+([-+0-9.eE]+)/i.exec(String(value ?? ""));
+  if (!match) return { latitude: null, longitude: null };
+  const first = Number(match[1]);
+  const second = Number(match[2]);
+  if (!Number.isFinite(first) || !Number.isFinite(second)) return { latitude: null, longitude: null };
+
+  if (first >= 2 && first <= 8 && second >= 50 && second <= 55) {
+    return { longitude: first, latitude: second };
+  }
+  if (second >= 2 && second <= 8 && first >= 50 && first <= 55) {
+    return { longitude: second, latitude: first };
+  }
+  return { latitude: null, longitude: null };
+}
+
+function parseWfsWindCsv(text, expectedQuantity) {
+  const rows = parseDelimited(text);
+  if (rows.length < 2) return [];
+  const headers = rows[0].map(normalizedHeader);
+  const results = [];
+
+  for (const values of rows.slice(1)) {
+    const row = Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""]));
+    const quantity = String(rowValue(row, ["GROOTHEIDCODE", "GROOTHEID_CODE"]) ?? "").toUpperCase();
+    if (quantity && quantity !== expectedQuantity) continue;
+
+    const rawValue = numericValue(rowValue(row, [
+      "WAARDE_LAATSTE_METING", "MEETWAARDE", "WAARDE_NUMERIEK", "VALUE"
+    ]));
+    if (rawValue === null) continue;
+
+    const locationCode = String(rowValue(row, ["CODE", "LOCATIECODE", "LOCATIE_CODE"]) ?? "").toLowerCase();
+    if (!locationCode) continue;
+
+    const geometry = geometryLatLon(rowValue(row, ["WKT", "THE_GEOM", "GEOMETRY", "MSGEOMETRY"]));
+    const latitude = numericValue(rowValue(row, ["LAT", "LATITUDE", "BREEDTEGRAAD"])) ?? geometry.latitude;
+    const longitude = numericValue(rowValue(row, ["LON", "LONGITUDE", "LENGTEGRAAD"])) ?? geometry.longitude;
+    const unit = String(rowValue(row, ["EENHEIDCODE", "EENHEID_CODE", "UNIT"]) ?? (expectedQuantity === "WINDSHD" ? "m/s" : "graad"));
+    const measuredAt = toIsoOrNull(rowValue(row, [
+      "TIJDSTIP_LAATSTE_METING", "TIJDSTIP", "DATUMTIJD", "DATE_TIME"
+    ]));
+    if (!measuredAt) continue;
+
+    results.push({
+      locationCode,
+      locationName: String(rowValue(row, ["NAAM", "LOCATIENAAM", "LOCATIE_NAAM"]) ?? locationCode),
+      latitude,
+      longitude,
+      measuredAt,
+      value: rawValue,
+      unit
+    });
+  }
+  return results;
+}
+
+function wfsWindUrl(quantity) {
+  const filter = `<Filter xmlns="http://www.opengis.net/ogc"><PropertyIsEqualTo><PropertyName>GROOTHEIDCODE</PropertyName><Literal>${quantity}</Literal></PropertyIsEqualTo></Filter>`;
+  const url = new URL(WIND_WFS_URL);
+  url.searchParams.set("SERVICE", "WFS");
+  url.searchParams.set("VERSION", "1.1.0");
+  url.searchParams.set("REQUEST", "GetFeature");
+  url.searchParams.set("TYPENAME", "locatiesmetlaatstewaarneming");
+  url.searchParams.set("SRSNAME", "EPSG:4326");
+  url.searchParams.set("FILTER", filter);
+  url.searchParams.set("outputFormat", "csv");
+  url.searchParams.set("format_options", "csvseparator:semicolon");
+  return url;
+}
+
+async function fetchWindSeries(quantity) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(wfsWindUrl(quantity), {
+      signal: controller.signal,
+      headers: {
+        accept: "text/csv, text/plain;q=0.9, */*;q=0.8",
+        "user-agent": "BrugwachterDashboard/6.0"
+      }
+    });
+    if (!response.ok) throw new Error(`RWS WFS ${quantity} antwoordde met HTTP ${response.status}`);
+    const text = await response.text();
+    const rows = parseWfsWindCsv(text, quantity);
+    if (!rows.length) throw new Error(`RWS WFS gaf geen ${quantity}-metingen terug`);
+    return rows;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const toRadians = (value) => value * Math.PI / 180;
+  const earthRadiusKm = 6371;
+  const dLat = toRadians(lat2 - lat1);
+  const dLon = toRadians(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.sin(dLon / 2) ** 2;
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function combineWindSeries(speedRows, directionRows) {
+  const directionByCode = new Map();
+  for (const row of directionRows) {
+    const current = directionByCode.get(row.locationCode);
+    if (!current || timestamp(row.measuredAt) > timestamp(current.measuredAt)) {
+      directionByCode.set(row.locationCode, row);
+    }
+  }
+
+  const stations = [];
+  for (const speed of speedRows) {
+    const valueMps = windValueInMetresPerSecond(speed.value, speed.unit);
+    if (!Number.isFinite(valueMps) || valueMps < 0 || valueMps >= 100) continue;
+    const direction = directionByCode.get(speed.locationCode);
+    stations.push({
+      locationCode: speed.locationCode,
+      locationName: speed.locationName,
+      latitude: speed.latitude,
+      longitude: speed.longitude,
+      valueMps,
+      directionDegrees: direction ? normalizeWindDirection(direction.value) : null,
+      measuredAt: speed.measuredAt,
+      directionMeasuredAt: direction?.measuredAt ?? null
+    });
+  }
+  return stations;
+}
+
+async function downloadWindStations() {
+  const [speedRows, directionRows] = await Promise.all([
+    fetchWindSeries("WINDSHD"),
+    fetchWindSeries("WINDRTG").catch(() => [])
+  ]);
+  return combineWindSeries(speedRows, directionRows);
+}
+
 function unavailableWind(bridge, message = "Geen actuele windmeting ontvangen") {
   return {
     windSpeedMps: null,
@@ -906,29 +1109,39 @@ function unavailableWind(bridge, message = "Geen actuele windmeting ontvangen") 
   };
 }
 
-function windForBridge(bridge, measurements) {
-  const candidates = WIND_LOCATION_FALLBACKS[bridge.id] ?? bridge.waterLocations ?? [];
-
-  for (const location of candidates) {
-    const measurement = measurements.get(location.toLowerCase());
-    if (!measurement || typeof measurement.valueMps !== "number") continue;
-
-    const ageMs = Date.now() - timestamp(measurement.measuredAt);
-    return {
-      windSpeedMps: measurement.valueMps,
-      windDirectionDegrees: measurement.directionDegrees,
-      windMeasuredAt: measurement.measuredAt,
-      windLocationCode: measurement.locationCode,
-      windLocationName: measurement.locationName || "RWS windmeetpunt",
-      windStatus: ageMs > 6 * 60 * 60 * 1000 ? "stale" : "current",
-      windMessage: ageMs > 6 * 60 * 60 * 1000
-        ? "Laatste windmeting is ouder dan 6 uur"
-        : "Actuele RWS-windmeting",
-      windSourceUrl: WIND_SOURCE_URL
-    };
+function windForBridge(bridge, stations) {
+  let best = null;
+  for (const station of stations) {
+    if (
+      typeof station.valueMps !== "number" ||
+      !Number.isFinite(station.latitude) ||
+      !Number.isFinite(station.longitude)
+    ) continue;
+    const distanceKm = haversineKm(
+      bridge.latitude,
+      bridge.longitude,
+      station.latitude,
+      station.longitude
+    );
+    if (!best || distanceKm < best.distanceKm) best = { station, distanceKm };
   }
 
-  return unavailableWind(bridge);
+  if (!best) return unavailableWind(bridge, "Geen nabijgelegen officiële windmeting ontvangen");
+  const { station, distanceKm } = best;
+  const ageMs = Date.now() - timestamp(station.measuredAt);
+  return {
+    windSpeedMps: station.valueMps,
+    windDirectionDegrees: station.directionDegrees,
+    windMeasuredAt: station.measuredAt,
+    windLocationCode: station.locationCode,
+    windLocationName: station.locationName || "RWS windmeetpunt",
+    windDistanceKm: Math.round(distanceKm * 10) / 10,
+    windStatus: ageMs > 6 * 60 * 60 * 1000 ? "stale" : "current",
+    windMessage: ageMs > 6 * 60 * 60 * 1000
+      ? "Dichtstbijzijnde windmeting is ouder dan 6 uur"
+      : "Dichtstbijzijnde actuele RWS-windmeting",
+    windSourceUrl: WIND_SOURCE_URL
+  };
 }
 
 function mergeWindData(data, measurements, previousData = null) {
@@ -953,6 +1166,7 @@ function mergeWindData(data, measurements, previousData = null) {
           windMeasuredAt: previous.windMeasuredAt,
           windLocationCode: previous.windLocationCode,
           windLocationName: previous.windLocationName,
+          windDistanceKm: previous.windDistanceKm,
           windStatus: "stale",
           windMessage: "Laatste succesvolle RWS-windmeting",
           windSourceUrl: WIND_SOURCE_URL
@@ -1038,15 +1252,17 @@ async function refreshData({ force = false } = {}) {
         environment.waterByLocation,
         previousData
       );
-      dashboardData = mergeWindData(
-        dashboardData,
-        environment.windByLocation,
-        previousData
-      );
     } catch (error) {
-      errors.push(`Waterinfo/wind: ${error instanceof Error ? error.message : String(error)}`);
+      errors.push(`Waterinfo: ${error instanceof Error ? error.message : String(error)}`);
       dashboardData = mergeWaterData(dashboardData, new Map(), previousData);
-      dashboardData = mergeWindData(dashboardData, new Map(), previousData);
+    }
+
+    try {
+      const windStations = await downloadWindStations();
+      dashboardData = mergeWindData(dashboardData, windStations, previousData);
+    } catch (error) {
+      errors.push(`RWS wind: ${error instanceof Error ? error.message : String(error)}`);
+      dashboardData = mergeWindData(dashboardData, [], previousData);
     }
 
     state.data = dashboardData;
@@ -1086,17 +1302,17 @@ const HTML = `<!doctype html>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>Brugwachter Live</title>
 <style>
-:root{--bg:#e7eef1;--card:#fff;--ink:#102f40;--muted:#5a707b;--line:#d5e1e6;--navy:#0b3d54;--teal:#087e82;--pale:#eef5f6;--warm:#fff4e5;--red:#b83d38;--shadow:0 5px 18px rgba(24,52,67,.12)}
+:root{--bg:#171819;--card:#232526;--ink:#f5f3ef;--muted:#aaa49c;--line:#3b3d3f;--navy:#202224;--orange:#ff8a1c;--orange2:#f36f13;--pale:#2b2d2f;--warm:#33261b;--red:#ff5d50;--shadow:0 8px 24px rgba(0,0,0,.34)}
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:Arial,sans-serif;color:var(--ink)}
 main{height:100dvh;padding:8px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:8px}
-.card{min-height:0;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:11px;display:flex;flex-direction:column;gap:7px;overflow:hidden}
+.card{min-height:0;background:var(--card);border:1px solid var(--line);border-top:3px solid var(--orange);border-radius:14px;box-shadow:var(--shadow);padding:11px;display:flex;flex-direction:column;gap:7px;overflow:hidden}
 .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
-h2{font-size:clamp(22px,2.15vw,34px);line-height:1;margin:0;font-weight:900;letter-spacing:-.035em}.short{font-size:11px;color:var(--muted);margin-top:4px;font-weight:700}.badge{font-size:9px;font-weight:900;letter-spacing:.04em;border-radius:999px;padding:5px 7px;background:#edf1f3;color:#566a74;white-space:nowrap}.card[data-live="open"] .badge{background:#ffe2df;color:var(--red)}.card[data-live="planned"] .badge,.card[data-live="requested"] .badge{background:#dff3f1;color:#08716f}.card[data-live="unavailable"] .badge{background:#fff0dc;color:#8c561d}
-.next{background:linear-gradient(135deg,#0b3d54,#095b68);color:#fff;border-radius:11px;padding:9px 12px}.next-label{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:#b7e0e5;font-weight:900}.next-time{font-size:clamp(40px,4.6vw,70px);font-weight:900;line-height:.93;margin-top:4px;letter-spacing:-.045em}.next-day{font-size:11px;color:#d9ebef;margin-top:5px;font-weight:700}
-.data-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.data-box{min-width:0;border-radius:10px;padding:8px 9px;background:var(--pale);border:1px solid #d9e9eb}.data-label{font-size:9px;text-transform:uppercase;letter-spacing:.075em;color:#51717a;font-weight:900}.water-value,.wind-value{font-size:clamp(20px,2vw,31px);font-weight:900;line-height:1;margin-top:4px;color:#075d68}.data-detail{font-size:9px;line-height:1.2;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.live-value{font-size:clamp(14px,1.35vw,20px);font-weight:900;line-height:1.05;margin-top:5px}.live-detail{font-size:9px;color:var(--muted);margin-top:5px;line-height:1.2}
-.schedule{flex:1;background:#f5f8f9;border-radius:9px;padding:7px 9px;font-size:10px;line-height:1.25;color:#344f5b;overflow:hidden}.schedule strong{color:var(--ink)}
-.foot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-top:5px;border-top:1px solid var(--line);font-size:8px;color:var(--muted)}.links{display:flex;gap:8px}.foot a{color:var(--teal);font-weight:900;text-decoration:none}.status{position:fixed;right:10px;bottom:3px;font-size:8px;color:#718993;background:rgba(231,238,241,.92);padding:2px 5px;border-radius:5px;pointer-events:none}
+h2{font-size:clamp(22px,2.15vw,34px);line-height:1;margin:0;font-weight:900;letter-spacing:-.035em}.short{font-size:11px;color:var(--muted);margin-top:4px;font-weight:700}.badge{font-size:9px;font-weight:900;letter-spacing:.04em;border-radius:999px;padding:5px 7px;background:#343638;color:#d9d4cd;border:1px solid #4a4c4e;white-space:nowrap}.card[data-live="open"] .badge{background:#4b2521;color:#ff9b91;border-color:#7a3932}.card[data-live="planned"] .badge,.card[data-live="requested"] .badge{background:#3a291b;color:#ffb367;border-color:#6b4527}.card[data-live="unavailable"] .badge{background:#303234;color:#aaa49c}
+.next{background:linear-gradient(135deg,#202224,#2b2119);color:#fff;border:1px solid #59402b;border-radius:11px;padding:9px 12px}.next-label{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:#d6a474;font-weight:900}.next-time{font-size:clamp(40px,4.6vw,70px);font-weight:900;line-height:.93;margin-top:4px;letter-spacing:-.045em;color:var(--orange)}.next-day{font-size:11px;color:#d4cec7;margin-top:5px;font-weight:700}
+.data-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.data-box{min-width:0;border-radius:10px;padding:8px 9px;background:var(--pale);border:1px solid var(--line)}.data-label{font-size:9px;text-transform:uppercase;letter-spacing:.075em;color:#c18b5b;font-weight:900}.water-value,.wind-value{font-size:clamp(20px,2vw,31px);font-weight:900;line-height:1;margin-top:4px;color:var(--orange)}.data-detail{font-size:9px;line-height:1.2;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.live-value{font-size:clamp(14px,1.35vw,20px);font-weight:900;line-height:1.05;margin-top:5px;color:#f5f3ef}.live-detail{font-size:9px;color:var(--muted);margin-top:5px;line-height:1.2}
+.schedule{flex:1;background:#292b2d;border:1px solid #3c3e40;border-radius:9px;padding:7px 9px;font-size:10px;line-height:1.25;color:#c7c1ba;overflow:hidden}.schedule strong{color:var(--orange)}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-top:5px;border-top:1px solid var(--line);font-size:8px;color:var(--muted)}.links{display:flex;gap:8px}.foot a{color:var(--orange);font-weight:900;text-decoration:none}.status{position:fixed;right:10px;bottom:3px;font-size:8px;color:#b7afa7;background:rgba(27,28,29,.94);border:1px solid #3b3d3f;padding:2px 5px;border-radius:5px;pointer-events:none}
 @media(max-width:850px){main{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:5px;padding:5px}.card{padding:7px;gap:4px;border-radius:9px}h2{font-size:18px}.short{font-size:8px}.next{padding:6px 8px}.next-time{font-size:31px}.next-label,.next-day{font-size:8px}.data-row{gap:4px}.data-box{padding:5px}.water-value,.wind-value{font-size:18px}.live-value{font-size:12px}.data-detail,.live-detail{font-size:7px}.schedule{font-size:8px;padding:5px}.badge{font-size:7px;padding:3px 5px}.foot{font-size:6px}}
 </style>
 </head>
@@ -1135,6 +1351,7 @@ function wind(b){
   const dir=compassDirection(b.windDirectionDegrees);
   const bits=[beaufort(b.windSpeedMps)+' Bft'];
   if(dir)bits.push(dir);
+  if(typeof b.windDistanceKm==='number')bits.push(b.windDistanceKm.toLocaleString('nl-NL',{maximumFractionDigits:1})+' km');
   if(b.windMeasuredAt)bits.push(timeFmt.format(new Date(b.windMeasuredAt)));
   return {
     value:b.windSpeedMps.toLocaleString('nl-NL',{minimumFractionDigits:1,maximumFractionDigits:1})+' m/s',
@@ -1155,7 +1372,7 @@ function render(data){
       '<div class="next"><div class="next-label">'+escapeHtml(b.opportunityLabel)+'</div><div class="next-time">'+escapeHtml(o.time)+'</div><div class="next-day">'+escapeHtml(o.day)+'</div></div>'+ 
       '<div class="data-row"><div class="data-box"><div class="data-label">Actuele waterstand</div><div class="water-value">'+escapeHtml(w.value)+'</div><div class="data-detail" title="'+escapeHtml(b.waterLocationName||'')+'">'+escapeHtml(w.detail)+'</div></div><div class="data-box"><div class="data-label">Actuele wind</div><div class="wind-value">'+escapeHtml(v.value)+'</div><div class="data-detail" title="'+escapeHtml(b.windLocationName||'')+'">'+escapeHtml(v.detail)+'</div></div><div class="data-box"><div class="data-label">Concrete opening NDW</div><div class="live-value">'+escapeHtml(l.value)+'</div><div class="live-detail">'+escapeHtml(l.detail)+'</div></div></div>'+ 
       '<div class="schedule"><strong>Bediening pleziervaart:</strong> '+escapeHtml(b.scheduleText)+'</div>'+ 
-      '<div class="foot"><span title="Water: '+escapeHtml(b.waterLocationName||'RWS meetpunt')+' · Wind: '+escapeHtml(b.windLocationName||'RWS windmeetpunt')+'">RWS water + wind</span><span class="links"><a href="'+escapeHtml(b.scheduleSource)+'" target="_blank" rel="noopener">tijden</a><a href="'+escapeHtml(b.waterSourceUrl||'https://waterinfo.rws.nl/')+'" target="_blank" rel="noopener">metingen</a></span></div>';
+      '<div class="foot"><span title="Water: '+escapeHtml(b.waterLocationName||'RWS meetpunt')+' · Wind: '+escapeHtml(b.windLocationName||'RWS windmeetpunt')+'">RWS water · windmeetpunt: '+escapeHtml(b.windLocationName||'onbekend')+'</span><span class="links"><a href="'+escapeHtml(b.scheduleSource)+'" target="_blank" rel="noopener">tijden</a><a href="'+escapeHtml(b.waterSourceUrl||'https://waterinfo.rws.nl/')+'" target="_blank" rel="noopener">metingen</a></span></div>';
     cards.appendChild(article);
   }
 }
