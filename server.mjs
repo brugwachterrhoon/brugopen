@@ -20,45 +20,30 @@ const WIND_SOURCE_URL = WATER_SOURCE_URL;
 
 const WIND_LOCATION_FALLBACKS = {
   "botlekbrug": [
-    "botlek.oudemaas.botlekbrug",
-    "botlek.oudemaas",
-    "hoogvliet",
-    "spijkenisse.oudemaas.brug",
-    "spijkenisse.oudemaas",
-    "rotterdam.geulhaven"
+    "botlek.oudemaas.botlekbrug", "botlek.oudemaas", "hoogvliet",
+    "spijkenisse.oudemaas.brug", "spijkenisse.oudemaas", "rotterdam.geulhaven"
   ],
   "spijkenisserbrug": [
-    "spijkenisse.oudemaas.brug",
-    "spijkenisse.oudemaas",
-    "hoogvliet",
-    "botlek.oudemaas.botlekbrug"
+    "spijkenisse.oudemaas.brug", "spijkenisse.oudemaas", "hoogvliet", "botlek.oudemaas.botlekbrug"
   ],
-  "brug-over-de-noord": [
-    "alblasserdam",
-    "papendrecht",
-    "dordrecht.wantij",
-    "dordrecht.wantij.west"
-  ],
+  "brug-over-de-noord": ["alblasserdam", "papendrecht", "dordrecht.wantij", "dordrecht.wantij.west"],
   "papendrechtsebrug": [
-    "papendrecht",
-    "papendrecht.benedenmerwede",
-    "dordrecht.wantij",
-    "dordrecht.wantij.west",
-    "alblasserdam"
+    "papendrecht", "papendrecht.benedenmerwede", "dordrecht.wantij",
+    "dordrecht.wantij.west", "alblasserdam"
   ],
   "hartelbrug": [
-    "europoort.hartelbrug",
-    "hartelkanaal.vak81",
-    "botlek.hartelkering.binnen",
-    "botlek.oudemaas.botlekbrug",
-    "hoogvliet"
+    "europoort.hartelbrug", "hartelkanaal.vak81", "botlek.hartelkering.binnen",
+    "botlek.oudemaas.botlekbrug", "hoogvliet"
   ],
-  "wantijbrug": [
-    "dordrecht.wantij",
-    "dordrecht.wantij.west",
-    "papendrecht",
-    "alblasserdam"
-  ]
+  "wantijbrug": ["dordrecht.wantij", "dordrecht.wantij.west", "papendrecht", "alblasserdam"],
+  "van-brienenoordbrug": [
+    "rotterdam.vanbrienenoordbrug", "rotterdam.brienenoordbrug", "brienenoord", "rotterdam"
+  ],
+  "calandbrug": [
+    "botlek.rozenburgsesluis.calandkanaal", "europoort.calandkanaal.3",
+    "calandkanaal.vakc2", "calandkanaal.vak90"
+  ],
+  "merwedebrug-gorinchem": ["bovenmerwede", "gorinchem", "gorinchembinnen", "werkendam"]
 };
 
 const BRIDGES = [
@@ -73,7 +58,8 @@ const BRIDGES = [
     longitude: 4.3428,
     waterLocations: ["botlek.oudemaas.botlekbrug", "botlek.oudemaas", "hoogvliet", "spijkenisse.oudemaas.brug", "spijkenisse.oudemaas"],
     waterLocationLabel: "Botlek Oude Maas",
-    scheduleText: "Vaste tijden: :15 en :45 tussen 06:00–22:00. Werkdagen geen recreatievaart 06:30–09:30 en 15:30–18:30.",
+    scheduleText: "Vaste mogelijkheden om :15 en :45. Op werkdagen niet voor pleziervaart tijdens 06:30–09:30 en 15:30–18:30.",
+    professionalText: "Voor beroepsvaart kunnen andere voorwaarden gelden.",
     scheduleSource: "https://www.rijkswaterstaat.nl/wegen/projectenoverzicht/a15-botlekbrug-nieuwe-verbinding-weg-en-goederenspoorverkeer-scheepvaart-en-bromfietsers/hinder-en-maatregelen/scheepvaart"
   },
   {
@@ -87,7 +73,8 @@ const BRIDGES = [
     longitude: 4.331,
     waterLocations: ["spijkenisse.oudemaas.brug", "spijkenisse.oudemaas"],
     waterLocationLabel: "Spijkenisse Oude Maas",
-    scheduleText: "Vaste tijd: op het halve uur tussen 06:00–22:00. Werkdagen geen recreatievaart 06:30–09:30 en 15:30–18:30.",
+    scheduleText: "Vaste mogelijkheid op het halve uur. Op werkdagen niet voor pleziervaart tijdens 06:30–09:30 en 15:30–18:30.",
+    professionalText: "Voor beroepsvaart kunnen andere voorwaarden gelden.",
     scheduleSource: "https://www.rijkswaterstaat.nl/wegen/projectenoverzicht/a15-botlekbrug-nieuwe-verbinding-weg-en-goederenspoorverkeer-scheepvaart-en-bromfietsers/hinder-en-maatregelen/scheepvaart"
   },
   {
@@ -101,7 +88,8 @@ const BRIDGES = [
     longitude: 4.6586,
     waterLocations: ["alblasserdam"],
     waterLocationLabel: "Alblasserdam",
-    scheduleText: "Zomer: dagelijks 10:00, 11:00, 12:00, 13:00, 14:00 en 16:00; weekend ook 09:00, 15:00 en 18:00; werkdagen 09:15 en 18:15.",
+    scheduleText: "Zomerregeling met vaste pleziervaartmomenten; de twee eerstvolgende worden hierboven getoond.",
+    professionalText: "Beroepsvaart kan extra of afwijkende bediening hebben.",
     scheduleSource: "https://www.vaarweginformatie.nl/frp/geo/detail/BRIDGE/43523"
   },
   {
@@ -114,8 +102,9 @@ const BRIDGES = [
     latitude: 51.8174,
     longitude: 4.7041,
     waterLocations: ["papendrecht", "papendrecht.benedenmerwede", "dordrecht.oudemaas.benedenmerwede"],
-    waterLocationLabel: "Beneden Merwede nabij Papendrecht",
-    scheduleText: "Geen vaste bediening wegens renovatie. Een bijzondere maandelijkse opening kan alleen na aanmelding en wordt als concrete melding getoond.",
+    waterLocationLabel: "Beneden-Merwede bij Papendrecht",
+    scheduleText: "Geen vaste bediening tijdens de renovatie; bijzondere passage alleen na aanmelding en officiële bevestiging.",
+    professionalText: "Voor hoge beroepsvaart zijn beperkte maandelijkse passagemogelijkheden aangekondigd.",
     scheduleSource: "https://www.vaarweginformatie.nl/frp/geo/detail/BRIDGE/47519"
   },
   {
@@ -130,6 +119,7 @@ const BRIDGES = [
     waterLocations: ["europoort.hartelbrug", "hartelkanaal.vak81", "botlek.hartelkering.binnen"],
     waterLocationLabel: "Hartelkanaal bij Hartelbrug",
     scheduleText: "24 uur op afroep, minimaal 2 uur vooraf. Werkdagen niet tijdens 06:45–08:30 en 16:00–18:30.",
+    professionalText: "Dezelfde afroepregeling; geen afzonderlijke tweede mogelijkheid weergegeven.",
     scheduleSource: "https://www.vaarweginformatie.nl/"
   },
   {
@@ -143,8 +133,54 @@ const BRIDGES = [
     longitude: 4.6915,
     waterLocations: ["dordrecht.wantij", "dordrecht.wantij.west", "dordrecht.oudemaas.benedenmerwede"],
     waterLocationLabel: "Wantij nabij Dordrecht",
-    scheduleText: "Zomer: werkdagen 09:30–15:30 en 18:30–22:00; weekend 09:30–22:00. Bediening bij aanvraag/aanbod.",
+    scheduleText: "Zomer: werkdagen 09:30–15:30 en 18:30–22:00; weekend 09:30–22:00. Bij aanvraag of aanbod.",
+    professionalText: "Beroepsvaart kan binnen dezelfde vensters voorrang hebben.",
     scheduleSource: "https://www.vaarweginformatie.nl/"
+  },
+  {
+    id: "van-brienenoordbrug",
+    windAlertAboveBft: null,
+    name: "Van Brienenoordbrug",
+    short: "A16 · Nieuwe Maas",
+    isrs: "NLRTM001020374200058",
+    scheduleType: "brienenoord",
+    latitude: 51.902828,
+    longitude: 4.542261,
+    waterLocations: ["rotterdam.vanbrienenoordbrug", "rotterdam.brienenoordbrug", "brienenoord", "rotterdam"],
+    waterLocationLabel: "Nieuwe Maas bij Brienenoord",
+    scheduleText: "Geen afzonderlijke vaste opening voor zeilschepen of Bruine Vloot. Nachtbediening alleen na aanvraag en goedkeuring, minimaal 12 uur vooraf.",
+    professionalText: "11:00, 14:00 en 19:30 uitsluitend voor beroepsvaart op afroep; niet als pleziervaarttijd berekend.",
+    scheduleSource: "https://www.vaarweginformatie.nl/frp/geo/detail/BRIDGE/4913"
+  },
+  {
+    id: "calandbrug",
+    windAlertAboveBft: null,
+    name: "Calandbrug",
+    short: "N15 · Calandkanaal",
+    isrs: "NLRTM001164917000018",
+    scheduleType: "caland",
+    latitude: 51.9013,
+    longitude: 4.2269,
+    waterLocations: ["botlek.rozenburgsesluis.calandkanaal", "europoort.calandkanaal.3", "calandkanaal.vakc2", "calandkanaal.vak90"],
+    waterLocationLabel: "Calandkanaal bij Calandbrug",
+    scheduleText: "Dagelijks op afroep. Verzoek ongeveer 20 minuten vóór de verwachte passage via VHF 22.",
+    professionalText: "De regeling geldt voor de scheepvaart; concrete openingen komen daarnaast uit NDW.",
+    scheduleSource: "https://www.vaarweginformatie.nl/frp/geo/detail/BRIDGE/5729"
+  },
+  {
+    id: "merwedebrug-gorinchem",
+    windAlertAboveBft: null,
+    name: "Merwedebrug Gorinchem",
+    short: "A27 · Boven-Merwede",
+    isrs: "NLGOR001010576200973",
+    scheduleType: "gorinchem",
+    latitude: 51.823736,
+    longitude: 4.96924,
+    waterLocations: ["bovenmerwede", "gorinchem", "gorinchembinnen", "werkendam"],
+    waterLocationLabel: "Boven-Merwede bij Gorinchem",
+    scheduleText: "Tot 17 augustus 2026 20:00 geen bediening. Daarna: werkdagen 20:00; weekend 11:00, 13:00 en in juli/augustus ook 14:00.",
+    professionalText: "Nachtvensters zijn bij aanbod; op werkdagen minimaal 24 uur vooraf melden. Niet als vaste pleziervaarttijd getoond.",
+    scheduleSource: "https://www.vaarweginformatie.nl/frp/geo/detail/BRIDGE/23300"
   }
 ];
 
@@ -281,8 +317,9 @@ function fixedQuarterTimes(localDate) {
   const values = [];
   for (let hour = 6; hour < 22; hour += 1) {
     for (const minute of [15, 45]) {
+      const total = hour * 60 + minute;
+      if (total < 6 * 60 + 30 || total >= 22 * 60) continue;
       if (!weekend) {
-        const total = hour * 60 + minute;
         const morningBan = total >= 6 * 60 + 30 && total < 9 * 60 + 30;
         const eveningBan = total >= 15 * 60 + 30 && total < 18 * 60 + 30;
         if (morningBan || eveningBan) continue;
@@ -317,6 +354,20 @@ function alblasserdamTimes(localDate) {
   return weekend
     ? [[9, 0], ...base, [15, 0], [18, 0]]
     : [[9, 15], ...base, [18, 15]];
+}
+
+function gorinchemTimes(localDate) {
+  const key = dateKey(localDate);
+  if (key < "2026-08-17" || key > "2027-12-31") return [];
+  const weekend = isWeekendOrHoliday(localDate);
+  if (!weekend) return [[20, 0]];
+  const values = [[11, 0], [13, 0]];
+  if (localDate.month === 7 || localDate.month === 8) values.push([14, 0]);
+  return values;
+}
+
+function calandOpportunity(now) {
+  return new Date(now.getTime() + 20 * 60 * 1000);
 }
 
 function nextWindowOpportunity(now, windowsBuilder, labelWhenOpen = "Nu binnen bedientijd") {
@@ -368,6 +419,20 @@ function scheduleOpportunity(bridge, now = new Date()) {
       instant,
       label: instant ? "Volgende vaste mogelijkheid" : "Geen vaste zomertijd gevonden",
       state: instant ? "fixed" : "none"
+    };
+  }
+  if (bridge.scheduleType === "brienenoord") {
+    return { instant: null, label: "Pleziervaart: minimaal 12 uur vooraf aanvragen", state: "request" };
+  }
+  if (bridge.scheduleType === "caland") {
+    return { instant: calandOpportunity(now), label: "Op afroep na circa 20 minuten", state: "request" };
+  }
+  if (bridge.scheduleType === "gorinchem") {
+    const instant = futureCandidates(now, gorinchemTimes, 550)[0] ?? null;
+    return {
+      instant,
+      label: instant ? "Eerstvolgende dagmogelijkheid" : "Geen dagmogelijkheid in de huidige regeling",
+      state: instant ? "fixed" : "closed"
     };
   }
   if (bridge.scheduleType === "papendrecht") {
@@ -434,6 +499,33 @@ function scheduleOpportunities(bridge, now = new Date()) {
       following: values[1] ?? null,
       label: values[0] ? "Vaste bedienmogelijkheid" : "Geen vaste zomertijd gevonden",
       state: values[0] ? "fixed" : "none"
+    };
+  }
+  if (bridge.scheduleType === "brienenoord") {
+    return {
+      first: null,
+      following: null,
+      followingText: "Na aanvraag en goedkeuring",
+      label: "Minimaal 12 uur vooraf aanvragen",
+      state: "request"
+    };
+  }
+  if (bridge.scheduleType === "caland") {
+    return {
+      first: calandOpportunity(now),
+      following: null,
+      followingText: "Daarna doorlopend op afroep",
+      label: "Verzoek circa 20 minuten vooraf",
+      state: "request"
+    };
+  }
+  if (bridge.scheduleType === "gorinchem") {
+    const values = futureCandidates(now, gorinchemTimes, 550);
+    return {
+      first: values[0] ?? null,
+      following: values[1] ?? null,
+      label: values[0] ? "Eerstvolgende dagmogelijkheid" : "Geen dagmogelijkheid in de huidige regeling",
+      state: values[0] ? "fixed" : "closed"
     };
   }
   if (bridge.scheduleType === "papendrecht") {
@@ -613,6 +705,7 @@ function parseNdwBridgeFeed(xml) {
       ...bridge,
       nextOpportunity: opportunities.first?.toISOString() ?? null,
       followingOpportunity: opportunities.following?.toISOString() ?? null,
+      followingOpportunityText: opportunities.followingText ?? null,
       opportunityLabel: opportunities.label,
       opportunityState: opportunities.state,
       ...selectEvent(records, now.getTime())
@@ -1285,6 +1378,7 @@ function fallbackData() {
         ...bridge,
         nextOpportunity: opportunities.first?.toISOString() ?? null,
         followingOpportunity: opportunities.following?.toISOString() ?? null,
+        followingOpportunityText: opportunities.followingText ?? null,
         opportunityLabel: opportunities.label,
         opportunityState: opportunities.state,
         liveStatus: "unavailable",
@@ -1397,18 +1491,21 @@ const HTML = `<!doctype html>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>Brugwachter Live</title>
 <style>
-:root{--bg:#171819;--card:#232526;--ink:#f5f3ef;--muted:#aaa49c;--line:#3b3d3f;--navy:#202224;--orange:#ff8a1c;--orange2:#f36f13;--pale:#2b2d2f;--warm:#33261b;--red:#ff5d50;--shadow:0 8px 24px rgba(0,0,0,.34)}
+:root{--bg:#171819;--card:#232526;--ink:#f7f4ee;--muted:#aaa49c;--line:#3d3f41;--orange:#ff8a1c;--orange2:#f36f13;--pale:#2b2d2f;--warm:#342619;--red:#ff5d50;--shadow:0 6px 18px rgba(0,0,0,.35)}
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:Arial,sans-serif;color:var(--ink)}
-main{height:100dvh;padding:8px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:8px}
-.card{min-height:0;background:var(--card);border:1px solid var(--line);border-top:3px solid var(--orange);border-radius:14px;box-shadow:var(--shadow);padding:11px;display:flex;flex-direction:column;gap:7px;overflow:hidden}
-.top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
-h2{font-size:clamp(22px,2.15vw,34px);line-height:1;margin:0;font-weight:900;letter-spacing:-.035em}.short{font-size:11px;color:var(--muted);margin-top:4px;font-weight:700}.badge{font-size:9px;font-weight:900;letter-spacing:.04em;border-radius:999px;padding:5px 7px;background:#343638;color:#d9d4cd;border:1px solid #4a4c4e;white-space:nowrap}.card[data-live="open"] .badge{background:#4b2521;color:#ff9b91;border-color:#7a3932}.card[data-live="planned"] .badge,.card[data-live="requested"] .badge{background:#3a291b;color:#ffb367;border-color:#6b4527}.card[data-live="unavailable"] .badge{background:#303234;color:#aaa49c}
-.next{background:linear-gradient(135deg,#202224,#2b2119);color:#fff;border:1px solid #59402b;border-radius:11px;padding:9px 12px}.next-label{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:#d6a474;font-weight:900}.next-time{font-size:clamp(40px,4.6vw,70px);font-weight:900;line-height:.93;margin-top:4px;letter-spacing:-.045em;color:var(--orange)}.next-day{font-size:11px;color:#d4cec7;margin-top:5px;font-weight:700}.following{display:grid;grid-template-columns:1fr auto;align-items:end;gap:8px;margin-top:7px;padding-top:7px;border-top:1px solid #59402b}.following-label{font-size:9px;text-transform:uppercase;letter-spacing:.075em;color:#d6a474;font-weight:900}.following-day{font-size:9px;color:#bfb7ae;margin-top:2px;font-weight:700}.following-time{font-size:clamp(22px,2.1vw,33px);font-weight:900;line-height:1;color:#fff;white-space:nowrap}
-.data-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.data-box{min-width:0;border-radius:10px;padding:8px 9px;background:var(--pale);border:1px solid var(--line)}.data-label{font-size:9px;text-transform:uppercase;letter-spacing:.075em;color:#c18b5b;font-weight:900}.water-value,.wind-value{font-size:clamp(20px,2vw,31px);font-weight:900;line-height:1;margin-top:4px;color:var(--orange)}@keyframes windWarningBlink{0%,100%{color:#fff;background:#3a3b3d;border-color:#fff;box-shadow:0 0 0 rgba(255,138,28,0)}50%{color:var(--orange);background:#3b2819;border-color:var(--orange);box-shadow:0 0 18px rgba(255,138,28,.7)}}.wind-alert{animation:windWarningBlink 1s steps(1,end) infinite}.wind-alert .data-label,.wind-alert .data-detail{color:inherit}.wind-alert .wind-value{color:inherit}@media(prefers-reduced-motion:reduce){.wind-alert{animation-duration:2.4s}}.data-detail{font-size:9px;line-height:1.2;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.live-value{font-size:clamp(14px,1.35vw,20px);font-weight:900;line-height:1.05;margin-top:5px;color:#f5f3ef}.live-detail{font-size:9px;color:var(--muted);margin-top:5px;line-height:1.2}
-.schedule{flex:1;background:#292b2d;border:1px solid #3c3e40;border-radius:9px;padding:7px 9px;font-size:10px;line-height:1.25;color:#c7c1ba;overflow:hidden}.schedule strong{color:var(--orange)}
-.foot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-top:5px;border-top:1px solid var(--line);font-size:8px;color:var(--muted)}.links{display:flex;gap:8px}.foot a{color:var(--orange);font-weight:900;text-decoration:none}.status{position:fixed;right:10px;bottom:3px;font-size:8px;color:#b7afa7;background:rgba(27,28,29,.94);border:1px solid #3b3d3f;padding:2px 5px;border-radius:5px;pointer-events:none}
-@media(max-width:850px){main{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:5px;padding:5px}.card{padding:7px;gap:4px;border-radius:9px}h2{font-size:18px}.short{font-size:8px}.next{padding:6px 8px}.next-time{font-size:31px}.next-label,.next-day{font-size:8px}.following{margin-top:4px;padding-top:4px}.following-label,.following-day{font-size:7px}.following-time{font-size:18px}.data-row{gap:4px}.data-box{padding:5px}.water-value,.wind-value{font-size:18px}.live-value{font-size:12px}.data-detail,.live-detail{font-size:7px}.schedule{font-size:8px;padding:5px}.badge{font-size:7px;padding:3px 5px}.foot{font-size:6px}}
+main{height:100dvh;padding:6px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:6px}
+.card{min-height:0;background:var(--card);border:1px solid var(--line);border-top:3px solid var(--orange);border-radius:11px;box-shadow:var(--shadow);padding:7px 8px;display:flex;flex-direction:column;gap:4px;overflow:hidden}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:6px;min-height:34px}
+h2{margin:0;font-size:clamp(20px,1.55vw,30px);line-height:.98;letter-spacing:-.025em;color:#fff}.short{font-size:9px;color:var(--muted);margin-top:3px;font-weight:700}.badge{border:1px solid #5b4632;background:#30271f;color:var(--orange);border-radius:999px;padding:3px 6px;font-size:7px;font-weight:900;white-space:nowrap;text-transform:uppercase;letter-spacing:.05em}
+.audience{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.06em}.pleasure{color:#fff;background:#343638;border:1px solid #4b4e50;border-radius:5px;padding:3px 6px}.night{color:var(--orange);background:#2e251d;border:1px solid #65411f;border-radius:5px;padding:3px 6px;white-space:nowrap}
+.timing{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,.85fr);gap:5px;background:var(--warm);border:1px solid #5d4028;border-radius:9px;padding:5px 7px}.timing.single{grid-template-columns:1fr}.timing-part{min-width:0}.timing-part+.timing-part{border-left:1px solid #61452f;padding-left:7px}.next-label{font-size:8px;text-transform:uppercase;letter-spacing:.075em;color:#d7a679;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.next-time{font-size:clamp(31px,3vw,53px);font-weight:900;line-height:.9;margin-top:3px;letter-spacing:-.045em;color:var(--orange);white-space:nowrap}.next-day{font-size:8px;color:#d5cec6;margin-top:4px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.following-time{font-size:clamp(22px,2vw,34px);font-weight:900;line-height:.95;margin-top:6px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.following-day{font-size:8px;color:#bfb7ae;margin-top:4px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.data-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}.data-box{min-width:0;border-radius:8px;padding:5px 6px;background:var(--pale);border:1px solid var(--line)}.data-label{font-size:7px;text-transform:uppercase;letter-spacing:.065em;color:#c18b5b;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.water-value,.wind-value{font-size:clamp(17px,1.55vw,28px);font-weight:900;line-height:1;margin-top:3px;color:var(--orange);white-space:nowrap}.data-detail{font-size:7px;line-height:1.15;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.live-value{font-size:clamp(11px,1vw,17px);font-weight:900;line-height:1.05;margin-top:4px;color:#f5f3ef;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.live-detail{font-size:7px;color:var(--muted);margin-top:4px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@keyframes windWarningBlink{0%,100%{color:#fff;background:#3a3b3d;border-color:#fff;box-shadow:0 0 0 rgba(255,138,28,0)}50%{color:var(--orange);background:#3b2819;border-color:var(--orange);box-shadow:0 0 15px rgba(255,138,28,.72)}}.wind-alert{animation:windWarningBlink 1s steps(1,end) infinite}.wind-alert .data-label,.wind-alert .data-detail,.wind-alert .wind-value{color:inherit}@media(prefers-reduced-motion:reduce){.wind-alert{animation-duration:2.4s}}
+.schedule{background:#292b2d;border:1px solid #3c3e40;border-radius:7px;padding:4px 6px;font-size:8px;line-height:1.15;color:#c9c3bc;overflow:hidden;min-height:35px}.schedule-row{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.schedule-row+ .schedule-row{margin-top:2px}.schedule strong{color:var(--orange)}.schedule .professional strong{color:#fff}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:5px;padding-top:3px;border-top:1px solid var(--line);font-size:6.5px;color:var(--muted);min-height:12px}.foot>span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.links{display:flex;gap:6px;flex:0 0 auto}.foot a{color:var(--orange);font-weight:900;text-decoration:none}.status{position:fixed;right:7px;bottom:2px;font-size:7px;color:#b7afa7;background:rgba(27,28,29,.94);border:1px solid #3b3d3f;padding:2px 5px;border-radius:5px;pointer-events:none}
+@media(min-width:1600px) and (min-aspect-ratio:16/10){main{padding:8px;gap:8px}.card{padding:9px 10px;gap:5px}.top{min-height:39px}.short{font-size:10px}.audience{font-size:9px}.next-label{font-size:9px}.next-day,.following-day{font-size:9px}.data-label{font-size:8px}.data-detail,.live-detail{font-size:8px}.schedule{font-size:9px;min-height:39px}.foot{font-size:7px}}
+@media(max-width:900px){html,body{height:auto;min-height:100%;overflow:auto}main{height:auto;min-height:100dvh;grid-template-columns:1fr;grid-template-rows:none;padding:6px}.card{min-height:285px}.schedule-row{white-space:normal}}
 </style>
 </head>
 <body>
@@ -1425,45 +1522,28 @@ function opportunity(b){
   if(!b.nextOpportunity)return {time:'—',day:b.opportunityLabel};
   const d=new Date(b.nextOpportunity);const diff=d.getTime()-Date.now();
   if(b.opportunityState==='window'&&Math.abs(diff)<60000)return {time:'NU',day:'Mogelijk bij aanvraag of aanbod'};
-  return {time:timeFmt.format(d),day:dayFmt.format(d)+' · opening niet gegarandeerd'};
+  return {time:timeFmt.format(d),day:dayFmt.format(d)+' · niet gegarandeerd'};
 }
 function followingOpportunity(b){
-  if(b.id==='hartelbrug'||!b.followingOpportunity)return null;
-  const d=new Date(b.followingOpportunity);
-  return {time:timeFmt.format(d),day:dayFmt.format(d)};
+  if(b.id==='hartelbrug')return null;
+  if(b.followingOpportunityText)return {time:b.followingOpportunityText,day:'Geen afzonderlijk vast tijdstip'};
+  if(!b.followingOpportunity)return null;
+  const d=new Date(b.followingOpportunity);return {time:timeFmt.format(d),day:dayFmt.format(d)+' · niet gegarandeerd'};
 }
 function water(b){
   if(typeof b.waterLevelMetres!=='number')return {value:'—',detail:b.waterMessage||'Geen actuele meting'};
   const sign=b.waterLevelMetres>0?'+':'';
-  return {value:sign+b.waterLevelMetres.toLocaleString('nl-NL',{minimumFractionDigits:2,maximumFractionDigits:2})+' m',detail:'t.o.v. NAP · '+(b.waterMeasuredAt?timeFmt.format(new Date(b.waterMeasuredAt)):'tijd onbekend')};
+  return {value:sign+b.waterLevelMetres.toLocaleString('nl-NL',{minimumFractionDigits:2,maximumFractionDigits:2})+' m',detail:'NAP · '+(b.waterMeasuredAt?timeFmt.format(new Date(b.waterMeasuredAt)):'tijd onbekend')};
 }
-function compassDirection(degrees){
-  if(typeof degrees!=='number'||!Number.isFinite(degrees))return '';
-  const names=['N','NNO','NO','ONO','O','OZO','ZO','ZZO','Z','ZZW','ZW','WZW','W','WNW','NW','NNW'];
-  return names[Math.round((((degrees%360)+360)%360)/22.5)%16];
-}
-function beaufort(mps){
-  const limits=[0.3,1.6,3.4,5.5,8.0,10.8,13.9,17.2,20.8,24.5,28.5,32.7];
-  let force=0;while(force<limits.length&&mps>=limits[force])force+=1;return force;
-}
+function compassDirection(degrees){if(typeof degrees!=='number'||!Number.isFinite(degrees))return '';const names=['N','NNO','NO','ONO','O','OZO','ZO','ZZO','Z','ZZW','ZW','WZW','W','WNW','NW','NNW'];return names[Math.round((((degrees%360)+360)%360)/22.5)%16];}
+function beaufort(mps){const limits=[0.3,1.6,3.4,5.5,8.0,10.8,13.9,17.2,20.8,24.5,28.5,32.7];let force=0;while(force<limits.length&&mps>=limits[force])force+=1;return force;}
 function wind(b){
   if(typeof b.windSpeedMps!=='number')return {value:'—',detail:b.windMessage||'Geen actuele meting',bft:null};
-  const dir=compassDirection(b.windDirectionDegrees);
-  const bft=beaufort(b.windSpeedMps);
-  const bits=[bft+' Bft'];
-  if(dir)bits.push(dir);
-  if(typeof b.windDistanceKm==='number')bits.push(b.windDistanceKm.toLocaleString('nl-NL',{maximumFractionDigits:1})+' km');
-  if(b.windMeasuredAt)bits.push(timeFmt.format(new Date(b.windMeasuredAt)));
-  return {
-    value:b.windSpeedMps.toLocaleString('nl-NL',{minimumFractionDigits:1,maximumFractionDigits:1})+' m/s',
-    detail:bits.join(' · '),
-    bft
-  };
+  const dir=compassDirection(b.windDirectionDegrees),bft=beaufort(b.windSpeedMps),bits=[bft+' Bft'];
+  if(dir)bits.push(dir);if(typeof b.windDistanceKm==='number')bits.push(b.windDistanceKm.toLocaleString('nl-NL',{maximumFractionDigits:1})+' km');if(b.windMeasuredAt)bits.push(timeFmt.format(new Date(b.windMeasuredAt)));
+  return {value:b.windSpeedMps.toLocaleString('nl-NL',{minimumFractionDigits:1,maximumFractionDigits:1})+' m/s',detail:bits.join(' · '),bft};
 }
-function live(b){
-  if(b.liveStart){const d=new Date(b.liveStart);return {value:b.liveLabel.replace('NDW: ',''),detail:dayFmt.format(d)+' '+timeFmt.format(d)};}
-  return {value:b.liveLabel.replace('NDW: ',''),detail:b.liveMessage};
-}
+function live(b){if(b.liveStart){const d=new Date(b.liveStart);return {value:b.liveLabel.replace('NDW: ',''),detail:dayFmt.format(d)+' '+timeFmt.format(d)};}return {value:b.liveLabel.replace('NDW: ',''),detail:b.liveMessage};}
 function render(data){
   cards.innerHTML='';
   for(const b of data.bridges){
@@ -1474,21 +1554,15 @@ function render(data){
     const article=document.createElement('article');article.className='card';article.dataset.live=b.liveStatus;
     article.innerHTML=
       '<div class="top"><div><h2>'+escapeHtml(b.name)+'</h2><div class="short">'+escapeHtml(b.short)+'</div></div><span class="badge">'+escapeHtml(b.liveLabel.replace('NDW: ',''))+'</span></div>'+ 
-      '<div class="next"><div class="next-label">Eerste mogelijke bediening</div><div class="next-time">'+escapeHtml(o.time)+'</div><div class="next-day">'+escapeHtml(o.day)+'</div>'+(f?'<div class="following"><div><div class="following-label">Daarna: volgende mogelijke bediening</div><div class="following-day">'+escapeHtml(f.day)+' · opening niet gegarandeerd</div></div><div class="following-time">'+escapeHtml(f.time)+'</div></div>':'')+'</div>'+ 
-      '<div class="data-row"><div class="data-box"><div class="data-label">Actuele waterstand</div><div class="water-value">'+escapeHtml(w.value)+'</div><div class="data-detail" title="'+escapeHtml(b.waterLocationName||'')+'">'+escapeHtml(w.detail)+'</div></div><div class="'+windBoxClass+'" title="'+escapeHtml(windTitle)+'"><div class="data-label">Actuele wind</div><div class="wind-value">'+escapeHtml(v.value)+'</div><div class="data-detail" title="'+escapeHtml(b.windLocationName||'')+'">'+escapeHtml(v.detail)+'</div></div><div class="data-box"><div class="data-label">Concrete opening NDW</div><div class="live-value">'+escapeHtml(l.value)+'</div><div class="live-detail">'+escapeHtml(l.detail)+'</div></div></div>'+ 
-      '<div class="schedule"><strong>Bediening pleziervaart:</strong> '+escapeHtml(b.scheduleText)+'</div>'+ 
-      '<div class="foot"><span title="Water: '+escapeHtml(b.waterLocationName||'RWS meetpunt')+' · Wind: '+escapeHtml(b.windLocationName||'RWS windmeetpunt')+'">RWS water · windmeetpunt: '+escapeHtml(b.windLocationName||'onbekend')+'</span><span class="links"><a href="'+escapeHtml(b.scheduleSource)+'" target="_blank" rel="noopener">tijden</a><a href="'+escapeHtml(b.waterSourceUrl||'https://waterinfo.rws.nl/')+'" target="_blank" rel="noopener">metingen</a></span></div>';
+      '<div class="audience"><span class="pleasure">Tijden hieronder: pleziervaart</span><span class="night">Vrije doorvaart 22:00–06:30</span></div>'+ 
+      '<div class="timing '+(f?'':'single')+'"><div class="timing-part"><div class="next-label">Eerste mogelijke bediening</div><div class="next-time">'+escapeHtml(o.time)+'</div><div class="next-day">'+escapeHtml(o.day)+'</div></div>'+(f?'<div class="timing-part"><div class="next-label">Daarna: volgende mogelijkheid</div><div class="following-time">'+escapeHtml(f.time)+'</div><div class="following-day">'+escapeHtml(f.day)+'</div></div>':'')+'</div>'+ 
+      '<div class="data-row"><div class="data-box"><div class="data-label">Waterstand</div><div class="water-value">'+escapeHtml(w.value)+'</div><div class="data-detail" title="'+escapeHtml(b.waterLocationName||'')+'">'+escapeHtml(w.detail)+'</div></div><div class="'+windBoxClass+'" title="'+escapeHtml(windTitle)+'"><div class="data-label">Wind</div><div class="wind-value">'+escapeHtml(v.value)+'</div><div class="data-detail" title="'+escapeHtml(b.windLocationName||'')+'">'+escapeHtml(v.detail)+'</div></div><div class="data-box"><div class="data-label">Concrete opening NDW</div><div class="live-value">'+escapeHtml(l.value)+'</div><div class="live-detail">'+escapeHtml(l.detail)+'</div></div></div>'+ 
+      '<div class="schedule"><div class="schedule-row"><strong>Pleziervaart:</strong> '+escapeHtml(b.scheduleText)+'</div><div class="schedule-row professional"><strong>Beroepsvaart:</strong> '+escapeHtml(b.professionalText||'Afwijkende voorwaarden mogelijk; controleer Vaarweginformatie.')+'</div></div>'+ 
+      '<div class="foot"><span title="Water: '+escapeHtml(b.waterLocationName||'RWS meetpunt')+' · Wind: '+escapeHtml(b.windLocationName||'RWS windmeetpunt')+'">RWS water · wind: '+escapeHtml(b.windLocationName||'onbekend')+'</span><span class="links"><a href="'+escapeHtml(b.scheduleSource)+'" target="_blank" rel="noopener">tijden</a><a href="'+escapeHtml(b.waterSourceUrl||'https://waterinfo.rws.nl/')+'" target="_blank" rel="noopener">metingen</a></span></div>';
     cards.appendChild(article);
   }
 }
-async function load(){
-  try{
-    const response=await fetch('/api/dashboard',{cache:'no-store'});const payload=await response.json();
-    if(!payload.data)throw new Error(payload.error||'Geen gegevens');render(payload.data);
-    const stamp=payload.data.publicationTime||payload.lastSuccessAt||payload.data.processedAt;
-    statusEl.textContent=(payload.error?'laatste gegevens · ':'live · ')+(stamp?stampFmt.format(new Date(stamp)):'tijd onbekend');
-  }catch(error){statusEl.textContent='fout: '+(error.message||error);}
-}
+async function load(){try{const response=await fetch('/api/dashboard',{cache:'no-store'});const payload=await response.json();if(!payload.data)throw new Error(payload.error||'Geen gegevens');render(payload.data);const stamp=payload.data.publicationTime||payload.lastSuccessAt||payload.data.processedAt;statusEl.textContent=(payload.error?'laatste gegevens · ':'live · ')+(stamp?stampFmt.format(new Date(stamp)):'tijd onbekend');}catch(error){statusEl.textContent='fout: '+(error.message||error);}}
 load();setInterval(load,60000);
 </script>
 </body>
