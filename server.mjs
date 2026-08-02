@@ -13,6 +13,50 @@ const REFRESH_INTERVAL_MS = Number(process.env.REFRESH_INTERVAL_MS || 300000);
 const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 20000);
 const REFRESH_SECRET = process.env.REFRESH_SECRET || "";
 const TIME_ZONE = "Europe/Amsterdam";
+const WIND_SOURCE_URL = WATER_SOURCE_URL;
+
+const WIND_LOCATION_FALLBACKS = {
+  "botlekbrug": [
+    "botlek.oudemaas.botlekbrug",
+    "botlek.oudemaas",
+    "hoogvliet",
+    "spijkenisse.oudemaas.brug",
+    "spijkenisse.oudemaas",
+    "rotterdam.geulhaven"
+  ],
+  "spijkenisserbrug": [
+    "spijkenisse.oudemaas.brug",
+    "spijkenisse.oudemaas",
+    "hoogvliet",
+    "botlek.oudemaas.botlekbrug"
+  ],
+  "brug-over-de-noord": [
+    "alblasserdam",
+    "papendrecht",
+    "dordrecht.wantij",
+    "dordrecht.wantij.west"
+  ],
+  "papendrechtsebrug": [
+    "papendrecht",
+    "papendrecht.benedenmerwede",
+    "dordrecht.wantij",
+    "dordrecht.wantij.west",
+    "alblasserdam"
+  ],
+  "hartelbrug": [
+    "europoort.hartelbrug",
+    "hartelkanaal.vak81",
+    "botlek.hartelkering.binnen",
+    "botlek.oudemaas.botlekbrug",
+    "hoogvliet"
+  ],
+  "wantijbrug": [
+    "dordrecht.wantij",
+    "dordrecht.wantij.west",
+    "papendrecht",
+    "alblasserdam"
+  ]
+};
 
 const BRIDGES = [
   {
@@ -531,14 +575,53 @@ function observationLocationName(observation, fallback) {
   ));
 }
 
-function observationUnit(observation, measurement) {
+function observationUnit(observation, measurement, fallback = "") {
   return String(firstValue(
     measurement?.AquoMetadata?.Eenheid?.Code,
     measurement?.aquoMetadata?.eenheid?.code,
     observation?.AquoMetadata?.Eenheid?.Code,
     observation?.aquoMetadata?.eenheid?.code,
-    "cm"
+    fallback
   ));
+}
+
+function observationQuantityCode(observation) {
+  return String(firstValue(
+    observation?.AquoMetadata?.Grootheid?.Code,
+    observation?.aquoMetadata?.grootheid?.code,
+    observation?.AquoPlusWaarnemingMetadata?.AquoMetadata?.Grootheid?.Code,
+    observation?.aquoPlusWaarnemingMetadata?.aquoMetadata?.grootheid?.code,
+    ""
+  )).toUpperCase();
+}
+
+function observationDescription(observation) {
+  return String(firstValue(
+    observation?.AquoMetadata?.Parameter_Wat_Omschrijving,
+    observation?.aquoMetadata?.parameter_Wat_Omschrijving,
+    observation?.AquoPlusWaarnemingMetadata?.AquoMetadata?.Parameter_Wat_Omschrijving,
+    observation?.aquoPlusWaarnemingMetadata?.aquoMetadata?.parameter_Wat_Omschrijving,
+    ""
+  ));
+}
+
+function observationMethodText(observation) {
+  const metadata = firstValue(
+    observation?.AquoMetadata,
+    observation?.aquoMetadata,
+    observation?.AquoPlusWaarnemingMetadata?.AquoMetadata,
+    observation?.aquoPlusWaarnemingMetadata?.aquoMetadata,
+    {}
+  );
+  return JSON.stringify(metadata);
+}
+
+function windSeriesScore(observation) {
+  const text = `${observationDescription(observation)} ${observationMethodText(observation)}`.toLowerCase();
+  let score = 0;
+  if (/gemiddeld|average|mean|10.?min/.test(text)) score += 6;
+  if (/maximum|maximaal|windstoot|stoot|gust/.test(text)) score -= 20;
+  return score;
 }
 
 function measurementTime(measurement) {
@@ -584,39 +667,130 @@ function waterValueInMetres(value, unit) {
   return value;
 }
 
-function parseWaterResponse(payload) {
-  const byLocation = new Map();
+function putLatest(map, key, candidate, score = 0) {
+  const current = map.get(key);
+  if (
+    !current ||
+    score > (current.score ?? 0) ||
+    (score === (current.score ?? 0) &&
+      timestamp(candidate.measuredAt) > timestamp(current.measuredAt))
+  ) {
+    map.set(key, { ...candidate, score });
+  }
+}
+
+function windValueInMetresPerSecond(value, unit) {
+  const normalized = String(unit).toLowerCase().replace(/\s+/g, "");
+  if (normalized === "km/h" || normalized === "kmh") return value / 3.6;
+  if (normalized === "kn" || normalized === "knot" || normalized === "knopen") {
+    return value * 0.514444;
+  }
+  return value;
+}
+
+function normalizeWindDirection(value) {
+  if (!Number.isFinite(value)) return null;
+  return ((value % 360) + 360) % 360;
+}
+
+function parseEnvironmentalResponse(payload) {
+  const waterByLocation = new Map();
+  const speedByLocation = new Map();
+  const directionByLocation = new Map();
+
   for (const observation of observationLists(payload)) {
     const locationCode = observationLocationCode(observation);
     if (!locationCode) continue;
+
     const locationName = observationLocationName(observation, locationCode);
+    const quantity = observationQuantityCode(observation);
+    const seriesScore = quantity === "WINDSHD" ? windSeriesScore(observation) : 0;
+
     for (const measurement of measurementLists(observation)) {
       const time = measurementTime(measurement);
       const value = measurementNumber(measurement);
       const quality = measurementQuality(measurement);
       if (!time || value === null || quality === "99") continue;
-      const unit = observationUnit(observation, measurement);
-      const candidate = {
-        locationCode,
-        locationName,
-        valueMetres: waterValueInMetres(value, unit),
-        measuredAt: time,
-        qualityCode: quality,
-        originalUnit: unit
-      };
-      const current = byLocation.get(locationCode);
-      if (!current || timestamp(candidate.measuredAt) > timestamp(current.measuredAt)) {
-        byLocation.set(locationCode, candidate);
+
+      if (quantity === "WATHTE") {
+        const unit = observationUnit(observation, measurement, "cm");
+        putLatest(waterByLocation, locationCode, {
+          locationCode,
+          locationName,
+          valueMetres: waterValueInMetres(value, unit),
+          measuredAt: time,
+          qualityCode: quality,
+          originalUnit: unit
+        });
+      }
+
+      if (quantity === "WINDSHD" && seriesScore > -10) {
+        const unit = observationUnit(observation, measurement, "m/s");
+        const valueMps = windValueInMetresPerSecond(value, unit);
+        if (Number.isFinite(valueMps) && valueMps >= 0 && valueMps < 100) {
+          putLatest(speedByLocation, locationCode, {
+            locationCode,
+            locationName,
+            valueMps,
+            measuredAt: time,
+            qualityCode: quality,
+            originalUnit: unit
+          }, seriesScore);
+        }
+      }
+
+      if (quantity === "WINDRTG") {
+        const directionDegrees = normalizeWindDirection(value);
+        if (directionDegrees !== null) {
+          putLatest(directionByLocation, locationCode, {
+            locationCode,
+            locationName,
+            directionDegrees,
+            measuredAt: time,
+            qualityCode: quality,
+            originalUnit: observationUnit(observation, measurement, "graad")
+          });
+        }
       }
     }
   }
-  return byLocation;
+
+  const windByLocation = new Map();
+  const allWindLocations = new Set([
+    ...speedByLocation.keys(),
+    ...directionByLocation.keys()
+  ]);
+
+  for (const locationCode of allWindLocations) {
+    const speed = speedByLocation.get(locationCode);
+    const direction = directionByLocation.get(locationCode);
+    if (!speed && !direction) continue;
+
+    windByLocation.set(locationCode, {
+      locationCode,
+      locationName: speed?.locationName || direction?.locationName || locationCode,
+      valueMps: speed?.valueMps ?? null,
+      directionDegrees: direction?.directionDegrees ?? null,
+      measuredAt: speed?.measuredAt || direction?.measuredAt || null,
+      directionMeasuredAt: direction?.measuredAt || null,
+      speedMeasuredAt: speed?.measuredAt || null
+    });
+  }
+
+  return { waterByLocation, windByLocation };
 }
 
-async function downloadWaterLevels() {
-  const allLocations = [...new Set(BRIDGES.flatMap((bridge) => bridge.waterLocations))];
+async function downloadEnvironmentalData() {
+  const allLocations = [
+    ...new Set([
+      ...BRIDGES.flatMap((bridge) => bridge.waterLocations),
+      ...Object.values(WIND_LOCATION_FALLBACKS).flat()
+    ])
+  ];
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
   try {
     const response = await fetch(WATER_API_URL, {
       method: "POST",
@@ -625,7 +799,7 @@ async function downloadWaterLevels() {
         "content-type": "application/json",
         accept: "application/json",
         "x-api-key": "brugwachter-live",
-        "user-agent": "BrugwachterDashboard/4.0"
+        "user-agent": "BrugwachterDashboard/5.0"
       },
       body: JSON.stringify({
         LocatieLijst: allLocations.map((Code) => ({ Code })),
@@ -635,12 +809,28 @@ async function downloadWaterLevels() {
               Compartiment: { Code: "OW" },
               Grootheid: { Code: "WATHTE" }
             }
+          },
+          {
+            AquoMetadata: {
+              Compartiment: { Code: "LT" },
+              Grootheid: { Code: "WINDSHD" }
+            }
+          },
+          {
+            AquoMetadata: {
+              Compartiment: { Code: "LT" },
+              Grootheid: { Code: "WINDRTG" }
+            }
           }
         ]
       })
     });
-    if (!response.ok) throw new Error(`Waterinfo antwoordde met HTTP ${response.status}`);
-    return parseWaterResponse(await response.json());
+
+    if (!response.ok) {
+      throw new Error(`Waterinfo antwoordde met HTTP ${response.status}`);
+    }
+
+    return parseEnvironmentalResponse(await response.json());
   } finally {
     clearTimeout(timer);
   }
@@ -698,6 +888,77 @@ function mergeWaterData(data, measurements, previousData = null) {
           waterSourceUrl: WATER_SOURCE_URL
         };
       }
+      return { ...bridge, ...fresh };
+    })
+  };
+}
+
+function unavailableWind(bridge, message = "Geen actuele windmeting ontvangen") {
+  return {
+    windSpeedMps: null,
+    windDirectionDegrees: null,
+    windMeasuredAt: null,
+    windLocationCode: null,
+    windLocationName: "RWS windmeetpunt",
+    windStatus: "unavailable",
+    windMessage: message,
+    windSourceUrl: WIND_SOURCE_URL
+  };
+}
+
+function windForBridge(bridge, measurements) {
+  const candidates = WIND_LOCATION_FALLBACKS[bridge.id] ?? bridge.waterLocations ?? [];
+
+  for (const location of candidates) {
+    const measurement = measurements.get(location.toLowerCase());
+    if (!measurement || typeof measurement.valueMps !== "number") continue;
+
+    const ageMs = Date.now() - timestamp(measurement.measuredAt);
+    return {
+      windSpeedMps: measurement.valueMps,
+      windDirectionDegrees: measurement.directionDegrees,
+      windMeasuredAt: measurement.measuredAt,
+      windLocationCode: measurement.locationCode,
+      windLocationName: measurement.locationName || "RWS windmeetpunt",
+      windStatus: ageMs > 6 * 60 * 60 * 1000 ? "stale" : "current",
+      windMessage: ageMs > 6 * 60 * 60 * 1000
+        ? "Laatste windmeting is ouder dan 6 uur"
+        : "Actuele RWS-windmeting",
+      windSourceUrl: WIND_SOURCE_URL
+    };
+  }
+
+  return unavailableWind(bridge);
+}
+
+function mergeWindData(data, measurements, previousData = null) {
+  const previousById = new Map(
+    (previousData?.bridges ?? []).map((bridge) => [bridge.id, bridge])
+  );
+
+  return {
+    ...data,
+    windSource: "Rijkswaterstaat Waterinfo",
+    windSourceUrl: WIND_SOURCE_URL,
+    bridges: data.bridges.map((bridge) => {
+      const fresh = windForBridge(bridge, measurements);
+      if (fresh.windSpeedMps !== null) return { ...bridge, ...fresh };
+
+      const previous = previousById.get(bridge.id);
+      if (previous?.windSpeedMps !== null && previous?.windSpeedMps !== undefined) {
+        return {
+          ...bridge,
+          windSpeedMps: previous.windSpeedMps,
+          windDirectionDegrees: previous.windDirectionDegrees,
+          windMeasuredAt: previous.windMeasuredAt,
+          windLocationCode: previous.windLocationCode,
+          windLocationName: previous.windLocationName,
+          windStatus: "stale",
+          windMessage: "Laatste succesvolle RWS-windmeting",
+          windSourceUrl: WIND_SOURCE_URL
+        };
+      }
+
       return { ...bridge, ...fresh };
     })
   };
@@ -771,11 +1032,21 @@ async function refreshData({ force = false } = {}) {
     }
 
     try {
-      const measurements = await downloadWaterLevels();
-      dashboardData = mergeWaterData(dashboardData, measurements, previousData);
+      const environment = await downloadEnvironmentalData();
+      dashboardData = mergeWaterData(
+        dashboardData,
+        environment.waterByLocation,
+        previousData
+      );
+      dashboardData = mergeWindData(
+        dashboardData,
+        environment.windByLocation,
+        previousData
+      );
     } catch (error) {
-      errors.push(`Waterinfo: ${error instanceof Error ? error.message : String(error)}`);
+      errors.push(`Waterinfo/wind: ${error instanceof Error ? error.message : String(error)}`);
       dashboardData = mergeWaterData(dashboardData, new Map(), previousData);
+      dashboardData = mergeWindData(dashboardData, new Map(), previousData);
     }
 
     state.data = dashboardData;
@@ -823,10 +1094,10 @@ main{height:100dvh;padding:8px;display:grid;grid-template-columns:repeat(3,minma
 .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
 h2{font-size:clamp(22px,2.15vw,34px);line-height:1;margin:0;font-weight:900;letter-spacing:-.035em}.short{font-size:11px;color:var(--muted);margin-top:4px;font-weight:700}.badge{font-size:9px;font-weight:900;letter-spacing:.04em;border-radius:999px;padding:5px 7px;background:#edf1f3;color:#566a74;white-space:nowrap}.card[data-live="open"] .badge{background:#ffe2df;color:var(--red)}.card[data-live="planned"] .badge,.card[data-live="requested"] .badge{background:#dff3f1;color:#08716f}.card[data-live="unavailable"] .badge{background:#fff0dc;color:#8c561d}
 .next{background:linear-gradient(135deg,#0b3d54,#095b68);color:#fff;border-radius:11px;padding:9px 12px}.next-label{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:#b7e0e5;font-weight:900}.next-time{font-size:clamp(40px,4.6vw,70px);font-weight:900;line-height:.93;margin-top:4px;letter-spacing:-.045em}.next-day{font-size:11px;color:#d9ebef;margin-top:5px;font-weight:700}
-.data-row{display:grid;grid-template-columns:1fr 1fr;gap:7px}.data-box{min-width:0;border-radius:10px;padding:8px 9px;background:var(--pale);border:1px solid #d9e9eb}.data-label{font-size:9px;text-transform:uppercase;letter-spacing:.075em;color:#51717a;font-weight:900}.water-value{font-size:clamp(22px,2.3vw,34px);font-weight:900;line-height:1;margin-top:4px;color:#075d68}.data-detail{font-size:9px;line-height:1.2;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.live-value{font-size:clamp(14px,1.35vw,20px);font-weight:900;line-height:1.05;margin-top:5px}.live-detail{font-size:9px;color:var(--muted);margin-top:5px;line-height:1.2}
+.data-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.data-box{min-width:0;border-radius:10px;padding:8px 9px;background:var(--pale);border:1px solid #d9e9eb}.data-label{font-size:9px;text-transform:uppercase;letter-spacing:.075em;color:#51717a;font-weight:900}.water-value,.wind-value{font-size:clamp(20px,2vw,31px);font-weight:900;line-height:1;margin-top:4px;color:#075d68}.data-detail{font-size:9px;line-height:1.2;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.live-value{font-size:clamp(14px,1.35vw,20px);font-weight:900;line-height:1.05;margin-top:5px}.live-detail{font-size:9px;color:var(--muted);margin-top:5px;line-height:1.2}
 .schedule{flex:1;background:#f5f8f9;border-radius:9px;padding:7px 9px;font-size:10px;line-height:1.25;color:#344f5b;overflow:hidden}.schedule strong{color:var(--ink)}
 .foot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-top:5px;border-top:1px solid var(--line);font-size:8px;color:var(--muted)}.links{display:flex;gap:8px}.foot a{color:var(--teal);font-weight:900;text-decoration:none}.status{position:fixed;right:10px;bottom:3px;font-size:8px;color:#718993;background:rgba(231,238,241,.92);padding:2px 5px;border-radius:5px;pointer-events:none}
-@media(max-width:850px){main{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:5px;padding:5px}.card{padding:7px;gap:4px;border-radius:9px}h2{font-size:18px}.short{font-size:8px}.next{padding:6px 8px}.next-time{font-size:31px}.next-label,.next-day{font-size:8px}.data-row{gap:4px}.data-box{padding:5px}.water-value{font-size:20px}.live-value{font-size:12px}.data-detail,.live-detail{font-size:7px}.schedule{font-size:8px;padding:5px}.badge{font-size:7px;padding:3px 5px}.foot{font-size:6px}}
+@media(max-width:850px){main{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:5px;padding:5px}.card{padding:7px;gap:4px;border-radius:9px}h2{font-size:18px}.short{font-size:8px}.next{padding:6px 8px}.next-time{font-size:31px}.next-label,.next-day{font-size:8px}.data-row{gap:4px}.data-box{padding:5px}.water-value,.wind-value{font-size:18px}.live-value{font-size:12px}.data-detail,.live-detail{font-size:7px}.schedule{font-size:8px;padding:5px}.badge{font-size:7px;padding:3px 5px}.foot{font-size:6px}}
 </style>
 </head>
 <body>
@@ -850,6 +1121,26 @@ function water(b){
   const sign=b.waterLevelMetres>0?'+':'';
   return {value:sign+b.waterLevelMetres.toLocaleString('nl-NL',{minimumFractionDigits:2,maximumFractionDigits:2})+' m',detail:'t.o.v. NAP · '+(b.waterMeasuredAt?timeFmt.format(new Date(b.waterMeasuredAt)):'tijd onbekend')};
 }
+function compassDirection(degrees){
+  if(typeof degrees!=='number'||!Number.isFinite(degrees))return '';
+  const names=['N','NNO','NO','ONO','O','OZO','ZO','ZZO','Z','ZZW','ZW','WZW','W','WNW','NW','NNW'];
+  return names[Math.round((((degrees%360)+360)%360)/22.5)%16];
+}
+function beaufort(mps){
+  const limits=[0.3,1.6,3.4,5.5,8.0,10.8,13.9,17.2,20.8,24.5,28.5,32.7];
+  let force=0;while(force<limits.length&&mps>=limits[force])force+=1;return force;
+}
+function wind(b){
+  if(typeof b.windSpeedMps!=='number')return {value:'—',detail:b.windMessage||'Geen actuele meting'};
+  const dir=compassDirection(b.windDirectionDegrees);
+  const bits=[beaufort(b.windSpeedMps)+' Bft'];
+  if(dir)bits.push(dir);
+  if(b.windMeasuredAt)bits.push(timeFmt.format(new Date(b.windMeasuredAt)));
+  return {
+    value:b.windSpeedMps.toLocaleString('nl-NL',{minimumFractionDigits:1,maximumFractionDigits:1})+' m/s',
+    detail:bits.join(' · ')
+  };
+}
 function live(b){
   if(b.liveStart){const d=new Date(b.liveStart);return {value:b.liveLabel.replace('NDW: ',''),detail:dayFmt.format(d)+' '+timeFmt.format(d)};}
   return {value:b.liveLabel.replace('NDW: ',''),detail:b.liveMessage};
@@ -857,14 +1148,14 @@ function live(b){
 function render(data){
   cards.innerHTML='';
   for(const b of data.bridges){
-    const o=opportunity(b),w=water(b),l=live(b);
+    const o=opportunity(b),w=water(b),v=wind(b),l=live(b);
     const article=document.createElement('article');article.className='card';article.dataset.live=b.liveStatus;
     article.innerHTML=
       '<div class="top"><div><h2>'+escapeHtml(b.name)+'</h2><div class="short">'+escapeHtml(b.short)+'</div></div><span class="badge">'+escapeHtml(b.liveLabel.replace('NDW: ',''))+'</span></div>'+ 
       '<div class="next"><div class="next-label">'+escapeHtml(b.opportunityLabel)+'</div><div class="next-time">'+escapeHtml(o.time)+'</div><div class="next-day">'+escapeHtml(o.day)+'</div></div>'+ 
-      '<div class="data-row"><div class="data-box"><div class="data-label">Actuele waterstand</div><div class="water-value">'+escapeHtml(w.value)+'</div><div class="data-detail" title="'+escapeHtml(b.waterLocationName||'')+'">'+escapeHtml(w.detail)+'</div></div><div class="data-box"><div class="data-label">Concrete opening NDW</div><div class="live-value">'+escapeHtml(l.value)+'</div><div class="live-detail">'+escapeHtml(l.detail)+'</div></div></div>'+ 
+      '<div class="data-row"><div class="data-box"><div class="data-label">Actuele waterstand</div><div class="water-value">'+escapeHtml(w.value)+'</div><div class="data-detail" title="'+escapeHtml(b.waterLocationName||'')+'">'+escapeHtml(w.detail)+'</div></div><div class="data-box"><div class="data-label">Actuele wind</div><div class="wind-value">'+escapeHtml(v.value)+'</div><div class="data-detail" title="'+escapeHtml(b.windLocationName||'')+'">'+escapeHtml(v.detail)+'</div></div><div class="data-box"><div class="data-label">Concrete opening NDW</div><div class="live-value">'+escapeHtml(l.value)+'</div><div class="live-detail">'+escapeHtml(l.detail)+'</div></div></div>'+ 
       '<div class="schedule"><strong>Bediening pleziervaart:</strong> '+escapeHtml(b.scheduleText)+'</div>'+ 
-      '<div class="foot"><span>'+escapeHtml(b.waterLocationName||'RWS meetpunt')+'</span><span class="links"><a href="'+escapeHtml(b.scheduleSource)+'" target="_blank" rel="noopener">tijden</a><a href="'+escapeHtml(b.waterSourceUrl||'https://waterinfo.rws.nl/')+'" target="_blank" rel="noopener">water</a></span></div>';
+      '<div class="foot"><span title="Water: '+escapeHtml(b.waterLocationName||'RWS meetpunt')+' · Wind: '+escapeHtml(b.windLocationName||'RWS windmeetpunt')+'">RWS water + wind</span><span class="links"><a href="'+escapeHtml(b.scheduleSource)+'" target="_blank" rel="noopener">tijden</a><a href="'+escapeHtml(b.waterSourceUrl||'https://waterinfo.rws.nl/')+'" target="_blank" rel="noopener">metingen</a></span></div>';
     cards.appendChild(article);
   }
 }
