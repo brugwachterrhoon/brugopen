@@ -17,6 +17,10 @@ const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 20000);
 const REFRESH_SECRET = process.env.REFRESH_SECRET || "";
 const TIME_ZONE = "Europe/Amsterdam";
 const WIND_SOURCE_URL = WATER_SOURCE_URL;
+const BAS_API_URL =
+  process.env.BAS_API_URL ||
+  "https://www.vaarweginformatie.nl/frp/api/messages/nts/messagesIncludingChildren/";
+const BAS_SOURCE_URL = "https://www.vaarweginformatie.nl/frp/nts/list";
 
 const WIND_LOCATION_FALLBACKS = {
   "botlekbrug": [
@@ -53,6 +57,7 @@ const BRIDGES = [
     name: "Botlekbrug",
     short: "A15 · Oude Maas",
     isrs: "NLRTM001110888700281",
+    vndsId: 17838816,
     scheduleType: "botlek",
     latitude: 51.867,
     longitude: 4.3428,
@@ -68,6 +73,7 @@ const BRIDGES = [
     name: "Spijkenisserbrug",
     short: "S102 · Oude Maas",
     isrs: "NLSPI001110572700266",
+    vndsId: 42792,
     scheduleType: "spijkenisse",
     latitude: 51.845,
     longitude: 4.331,
@@ -83,6 +89,7 @@ const BRIDGES = [
     name: "Brug over de Noord",
     short: "Alblasserdamsebrug · N915",
     isrs: "NLHIA001010577301210",
+    vndsId: 43523,
     scheduleType: "alblasserdam",
     latitude: 51.8544,
     longitude: 4.6586,
@@ -98,6 +105,7 @@ const BRIDGES = [
     name: "Papendrechtsebrug",
     short: "Merwedebrug · N3",
     isrs: "NLDOR001010577001143",
+    vndsId: 47519,
     scheduleType: "papendrecht",
     latitude: 51.8174,
     longitude: 4.7041,
@@ -130,6 +138,7 @@ const BRIDGES = [
     name: "Hartelbrug",
     short: "N218 · Hartelkanaal",
     isrs: "NLRTM0115B5487800010",
+    vndsId: 23888,
     scheduleType: "hartel",
     latitude: 51.8756,
     longitude: 4.2258,
@@ -145,6 +154,7 @@ const BRIDGES = [
     name: "Wantijbrug",
     short: "N3 · Dordrecht",
     isrs: "NLDOR001100553200025",
+    vndsId: 10519,
     scheduleType: "wantij",
     latitude: 51.8087,
     longitude: 4.6915,
@@ -160,6 +170,7 @@ const BRIDGES = [
     name: "Van Brienenoordbrug",
     short: "A16 · Nieuwe Maas",
     isrs: "NLRTM001020374200058",
+    vndsId: 4308,
     scheduleType: "brienenoord",
     latitude: 51.902828,
     longitude: 4.542261,
@@ -190,6 +201,7 @@ const BRIDGES = [
     name: "Calandbrug",
     short: "N15 · Calandkanaal",
     isrs: "NLRTM001164917000018",
+    vndsId: 61127240,
     scheduleType: "caland",
     latitude: 51.9013,
     longitude: 4.2269,
@@ -220,6 +232,7 @@ const BRIDGES = [
     name: "Merwedebrug Gorinchem",
     short: "A27 · Boven-Merwede",
     isrs: "NLGOR001010576200973",
+    vndsId: 23300,
     scheduleType: "gorinchem",
     latitude: 51.823736,
     longitude: 4.96924,
@@ -766,6 +779,153 @@ function parseNdwBridgeFeed(xml) {
     processedAt: now.toISOString(),
     bridges
   };
+}
+
+function basNumber(summary) {
+  const number = summary?.ntsNumber;
+  if (!number) return null;
+  return [number.organisation, number.year, number.number]
+    .filter((value) => value !== undefined && value !== null && value !== "")
+    .join("-");
+}
+
+function basLimitation(limitationCode) {
+  const code = String(limitationCode ?? "").toUpperCase();
+  if (code === "NOSERV") {
+    return { status: "no-service", label: "GEEN BEDIENING", priority: 100 };
+  }
+  if (code === "OBSTRU") {
+    return { status: "obstruction", label: "STREMMING", priority: 90 };
+  }
+  if (code === "SERVIC") {
+    return { status: "restricted-service", label: "BEPERKTE BEDIENING", priority: 80 };
+  }
+  return { status: "restriction", label: "BEPERKING", priority: 60 };
+}
+
+function normalizeBasSummary(summary) {
+  const startMs = summary?.startDate === null || summary?.startDate === undefined
+    ? null
+    : Number(summary.startDate);
+  const endMs = summary?.endDate === null || summary?.endDate === undefined
+    ? null
+    : Number(summary.endDate);
+  const limitation = basLimitation(summary?.limitationCode);
+  return {
+    id: summary?.ntsSummaryId ?? null,
+    number: basNumber(summary),
+    type: summary?.ntsType ?? null,
+    limitationCode: summary?.limitationCode ?? null,
+    limitationStatus: limitation.status,
+    limitationLabel: limitation.label,
+    priority: limitation.priority,
+    fairwayName: summary?.fairwayName ?? null,
+    locationName: summary?.locationName ?? null,
+    start: Number.isFinite(startMs) ? new Date(startMs).toISOString() : null,
+    end: Number.isFinite(endMs) ? new Date(endMs).toISOString() : null
+  };
+}
+
+function selectBasMessage(messages, nowMs = Date.now()) {
+  const current = messages
+    .filter((message) => {
+      const startMs = timestamp(message.start);
+      const endMs = timestamp(message.end);
+      return (startMs === null || startMs <= nowMs) && (endMs === null || endMs > nowMs);
+    })
+    .sort((a, b) => b.priority - a.priority || (timestamp(b.end) ?? Infinity) - (timestamp(a.end) ?? Infinity))[0];
+
+  if (current) return { message: current, active: true };
+
+  const upcoming = messages
+    .filter((message) => (timestamp(message.start) ?? -Infinity) > nowMs)
+    .sort((a, b) => timestamp(a.start) - timestamp(b.start) || b.priority - a.priority)[0];
+  return upcoming ? { message: upcoming, active: false } : null;
+}
+
+async function downloadBasMessages(bridge) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${BAS_API_URL}${bridge.vndsId}`, {
+      signal: controller.signal,
+      headers: {
+        accept: "application/json",
+        "user-agent": "BrugwachterDashboard/7.0"
+      }
+    });
+    if (!response.ok) throw new Error(`Vaarweginformatie antwoordde met HTTP ${response.status}`);
+    const payload = await response.json();
+    if (!Array.isArray(payload)) throw new TypeError("Vaarweginformatie gaf geen berichtenlijst terug");
+    return payload.map(normalizeBasSummary);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function mergeBasData(data, results, now = new Date()) {
+  const byId = new Map(results.map((result) => [result.bridgeId, result]));
+  return {
+    ...data,
+    basSource: "Vaarweginformatie · BAS/scheepvaartberichten",
+    basSourceUrl: BAS_SOURCE_URL,
+    bridges: data.bridges.map((bridge) => {
+      const result = byId.get(bridge.id);
+      if (!result || result.error) {
+        return {
+          ...bridge,
+          basStatus: "unavailable",
+          basMessage: result?.error ?? "BAS-controle niet beschikbaar"
+        };
+      }
+
+      const messages = result.messages.filter((message) => {
+        const endMs = timestamp(message.end);
+        return endMs === null || endMs > now.getTime();
+      });
+      const selected = selectBasMessage(messages, now.getTime());
+      if (!selected) {
+        return {
+          ...bridge,
+          basStatus: "none",
+          basMessages: [],
+          basMessage: "Alle BAS-berichten gecontroleerd; geen actieve of komende beperking."
+        };
+      }
+
+      const { message, active } = selected;
+      const liveLabel = `BAS: ${active ? message.limitationLabel : `AANKOMEND ${message.limitationLabel}`}`;
+      return {
+        ...bridge,
+        basStatus: active ? "active" : "upcoming",
+        basMessages: messages,
+        basMessage: message.number,
+        basSourceUrl: `https://www.vaarweginformatie.nl/frp/geo/detail/BRIDGE/${bridge.vndsId}`,
+        liveStatus: active ? message.limitationStatus : "planned-restriction",
+        liveLabel,
+        liveStart: message.start,
+        liveEnd: message.end,
+        liveSource: "BAS",
+        liveMessage: message.number
+          ? `${message.number} · ${message.locationName || bridge.name}`
+          : message.locationName || bridge.name
+      };
+    })
+  };
+}
+
+async function downloadAllBasMessages() {
+  return Promise.all(BRIDGES.map(async (bridge) => {
+    try {
+      return { bridgeId: bridge.id, messages: await downloadBasMessages(bridge), error: null };
+    } catch (error) {
+      return {
+        bridgeId: bridge.id,
+        messages: [],
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  }));
 }
 
 
@@ -1539,6 +1699,17 @@ async function refreshData({ force = false } = {}) {
       dashboardData = fallbackData();
     }
 
+    try {
+      const basResults = await downloadAllBasMessages();
+      dashboardData = mergeBasData(dashboardData, basResults);
+      const failed = basResults.filter((result) => result.error);
+      if (failed.length) {
+        errors.push(`BAS: ${failed.length} van ${BRIDGES.length} brugcontroles mislukt`);
+      }
+    } catch (error) {
+      errors.push(`BAS: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
     let waterMeasurements = new Map();
     let waterStations = [];
 
@@ -1662,7 +1833,15 @@ function wind(b){
   if(dir)bits.push(dir);if(typeof b.windDistanceKm==='number')bits.push(b.windDistanceKm.toLocaleString('nl-NL',{maximumFractionDigits:1})+' km');if(b.windMeasuredAt)bits.push(timeFmt.format(new Date(b.windMeasuredAt)));
   return {value:b.windSpeedMps.toLocaleString('nl-NL',{minimumFractionDigits:1,maximumFractionDigits:1})+' m/s',detail:bits.join(' · '),bft};
 }
-function live(b){if(b.liveStart){const d=new Date(b.liveStart);return {value:b.liveLabel.replace('NDW: ',''),detail:dayFmt.format(d)+' '+timeFmt.format(d)};}return {value:b.liveLabel.replace('NDW: ',''),detail:b.liveMessage};}
+function live(b){
+  const value=b.liveLabel.replace(/^(?:NDW|BAS):\\s*/,"");
+  if(b.liveSource==='BAS'){
+    if(b.basStatus==='active'&&b.liveEnd){const d=new Date(b.liveEnd);return {value,detail:'Tot '+dayFmt.format(d)+' '+timeFmt.format(d)};}
+    if(b.liveStart){const d=new Date(b.liveStart);return {value,detail:'Vanaf '+dayFmt.format(d)+' '+timeFmt.format(d)};}
+  }
+  if(b.liveStart){const d=new Date(b.liveStart);return {value,detail:dayFmt.format(d)+' '+timeFmt.format(d)};}
+  return {value,detail:b.liveMessage};
+}
 function noticeContent(b){
   if(Array.isArray(b.specialPassages)&&b.specialPassages.length){
     const now=Date.now();
@@ -1695,12 +1874,12 @@ function render(data){
     const windTitle=windAlert?'Windwaarschuwing: '+v.bft+' Bft is hoger dan '+b.windAlertAboveBft+' Bft':'Actuele wind';
     const article=document.createElement('article');article.className='card';article.dataset.live=b.liveStatus;
     article.innerHTML=
-      '<div class="top"><div><h2>'+escapeHtml(b.name)+'</h2><div class="short">'+escapeHtml(b.short)+'</div></div><span class="badge">'+escapeHtml(b.liveLabel.replace('NDW: ',''))+'</span></div>'+ 
+      '<div class="top"><div><h2>'+escapeHtml(b.name)+'</h2><div class="short">'+escapeHtml(b.short)+'</div></div><span class="badge">'+escapeHtml(b.liveLabel.replace(/^(?:NDW|BAS):\\s*/,''))+'</span></div>'+
       '<div class="audience"><span class="pleasure">'+escapeHtml(audienceLabel)+'</span>'+nightPassage+'</div>'+ 
       timingHtml+ 
-      '<div class="data-row"><div class="data-box"><div class="data-label">Waterstand</div><div class="water-value">'+escapeHtml(w.value)+'</div><div class="data-detail" title="'+escapeHtml(b.waterLocationName||'')+'">'+escapeHtml(w.detail)+'</div></div><div class="'+windBoxClass+'" title="'+escapeHtml(windTitle)+'"><div class="data-label">Wind</div><div class="wind-value">'+escapeHtml(v.value)+'</div><div class="data-detail" title="'+escapeHtml(b.windLocationName||'')+'">'+escapeHtml(v.detail)+'</div></div><div class="data-box"><div class="data-label">Concrete opening NDW</div><div class="live-value">'+escapeHtml(l.value)+'</div><div class="live-detail">'+escapeHtml(l.detail)+'</div></div></div>'+ 
+      '<div class="data-row"><div class="data-box"><div class="data-label">Waterstand</div><div class="water-value">'+escapeHtml(w.value)+'</div><div class="data-detail" title="'+escapeHtml(b.waterLocationName||'')+'">'+escapeHtml(w.detail)+'</div></div><div class="'+windBoxClass+'" title="'+escapeHtml(windTitle)+'"><div class="data-label">Wind</div><div class="wind-value">'+escapeHtml(v.value)+'</div><div class="data-detail" title="'+escapeHtml(b.windLocationName||'')+'">'+escapeHtml(v.detail)+'</div></div><div class="data-box"><div class="data-label">'+escapeHtml(b.liveSource==='BAS'?'Actueel BAS-bericht':'Concrete opening NDW')+'</div><div class="live-value">'+escapeHtml(l.value)+'</div><div class="live-detail">'+escapeHtml(l.detail)+'</div></div></div>'+
       '<div class="schedule"><div class="schedule-row"><strong>Pleziervaart:</strong> '+escapeHtml(b.scheduleText)+'</div><div class="schedule-row professional"><strong>Beroepsvaart:</strong> '+escapeHtml(b.professionalText||'Afwijkende voorwaarden mogelijk; controleer Vaarweginformatie.')+'</div></div>'+ 
-      '<div class="foot"><span title="Water: '+escapeHtml(b.waterLocationName||'RWS meetpunt')+' · Wind: '+escapeHtml(b.windLocationName||'RWS windmeetpunt')+'">RWS water · wind: '+escapeHtml(b.windLocationName||'onbekend')+'</span><span class="links"><a href="'+escapeHtml(b.scheduleSource)+'" target="_blank" rel="noopener">tijden</a><a href="'+escapeHtml(b.waterSourceUrl||'https://waterinfo.rws.nl/')+'" target="_blank" rel="noopener">metingen</a></span></div>';
+      '<div class="foot"><span title="Water: '+escapeHtml(b.waterLocationName||'RWS meetpunt')+' · Wind: '+escapeHtml(b.windLocationName||'RWS windmeetpunt')+'">RWS water · wind: '+escapeHtml(b.windLocationName||'onbekend')+'</span><span class="links">'+(b.liveSource==='BAS'?'<a href="'+escapeHtml(b.basSourceUrl)+'" target="_blank" rel="noopener">BAS</a>':'')+'<a href="'+escapeHtml(b.scheduleSource)+'" target="_blank" rel="noopener">tijden</a><a href="'+escapeHtml(b.waterSourceUrl||'https://waterinfo.rws.nl/')+'" target="_blank" rel="noopener">metingen</a></span></div>';
     cards.appendChild(article);
   }
 }
