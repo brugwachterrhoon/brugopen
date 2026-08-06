@@ -1,6 +1,6 @@
 # Brugwachter Live Dashboard
 
-Een responsive website met zes overzichtskaarten voor:
+Een responsive website met negen overzichtskaarten voor:
 
 - Botlekbrug
 - Spijkenisserbrug
@@ -8,11 +8,15 @@ Een responsive website met zes overzichtskaarten voor:
 - Papendrechtsebrug / Merwedebrug Papendrecht
 - Hartelbrug
 - Wantijbrug
+- Van Brienenoordbrug
+- Calandbrug
+- Merwedebrug Gorinchem
 
 Per brug toont de site uitsluitend live geverifieerde officiële gegevens over:
 
 - eerstvolgende toegestane bediening/openingsmogelijkheid;
 - actuele status, stremming of beperkte bediening;
+- alle actieve en komende BAS/scheepvaartberichten die op Vaarweginformatie aan de brug zijn gekoppeld;
 - officiële waterstandsverwachting voor het openingstijdstip, of duidelijk gelabeld de laatste meting;
 - officiële KNMI-windverwachting voor het openingstijdstip, of duidelijk gelabeld een actuele meting;
 - bron-URL en informatietijd.
@@ -40,10 +44,9 @@ Er zijn geen npm-pakketten nodig; de site gebruikt alleen ingebouwde Node.js-fun
 ## Live werking
 
 - Bij laden en vervolgens elke vijf minuten roept de browser `/api/dashboard` aan.
-- De server start per controle een nieuwe webzoekopdracht.
-- Webresultaten worden beperkt tot officiële domeinen zoals Rijkswaterstaat, Vaarweginformatie, Waterinfo, KNMI, Havenbedrijf Rotterdam en relevante overheden.
-- Een bron-URL wordt server-side gecontroleerd. Kaartgegevens zonder officiële bron worden vervangen door “Geen officiële live data”.
-- De geheime API-sleutel blijft op de server en wordt nooit naar de browser gestuurd.
+- De server controleert per brug de officiële Vaarweginformatie/BAS-datastroom, de NDW-planningsfeed en RWS Waterinfo.
+- Een actieve BAS-stremming of bedieningsbeperking krijgt voorrang op een gewone NDW-openingsmelding. De eindtijd wordt als “tot …” getoond.
+- Als één BAS-controle mislukt, blijft dat zichtbaar als bronfout en worden voor die brug geen BAS-conclusies verzonnen.
 
 ## Belangrijke betekenis van de gegevens
 
