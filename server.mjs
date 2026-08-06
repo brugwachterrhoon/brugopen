@@ -843,6 +843,36 @@ function selectBasMessage(messages, nowMs = Date.now()) {
   return upcoming ? { message: upcoming, active: false } : null;
 }
 
+function basInterimPassage(messages, selectedMessage) {
+  if (!selectedMessage?.number) return null;
+  const mainStart = timestamp(selectedMessage.start);
+  const mainEnd = timestamp(selectedMessage.end);
+  if (mainStart === null || mainEnd === null) return null;
+
+  const sibling = messages.find((message) => {
+    if (message.id === selectedMessage.id || message.number !== selectedMessage.number) return false;
+    const startMs = timestamp(message.start);
+    const endMs = timestamp(message.end);
+    if (startMs === null || endMs === null || endMs <= startMs) return false;
+
+    const start = new Date(startMs);
+    const end = new Date(endMs);
+    const startMinutes = Number(new Intl.DateTimeFormat("nl-NL", {
+      timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+    }).format(start).replace(":", ""));
+    const endMinutes = Number(new Intl.DateTimeFormat("nl-NL", {
+      timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+    }).format(end).replace(":", ""));
+    const startClock = Math.floor(startMinutes / 100) * 60 + (startMinutes % 100);
+    const endClock = Math.floor(endMinutes / 100) * 60 + (endMinutes % 100);
+    const clockDuration = (endClock - startClock + 1440) % 1440;
+
+    return endMs - startMs >= 12 * 60 * 60 * 1000 && clockDuration > 0 && clockDuration <= 180;
+  });
+
+  return sibling ? { start: sibling.start, end: sibling.end } : null;
+}
+
 async function downloadBasMessages(bridge) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -894,6 +924,7 @@ function mergeBasData(data, results, now = new Date()) {
       }
 
       const { message, active } = selected;
+      const interimPassage = basInterimPassage(messages, message);
       const liveLabel = `BAS: ${active ? message.limitationLabel : `AANKOMEND ${message.limitationLabel}`}`;
       return {
         ...bridge,
@@ -905,6 +936,8 @@ function mergeBasData(data, results, now = new Date()) {
         liveLabel,
         liveStart: message.start,
         liveEnd: message.end,
+        liveInterimStart: interimPassage?.start ?? null,
+        liveInterimEnd: interimPassage?.end ?? null,
         liveSource: "BAS",
         liveMessage: message.number
           ? `${message.number} · ${message.locationName || bridge.name}`
@@ -1787,7 +1820,7 @@ main{height:100dvh;padding:6px;display:grid;grid-template-columns:repeat(3,minma
 h2{margin:0;font-size:clamp(20px,1.55vw,30px);line-height:.98;letter-spacing:-.025em;color:#fff}.short{font-size:9px;color:var(--muted);margin-top:3px;font-weight:700}.badge{border:1px solid #5b4632;background:#30271f;color:var(--orange);border-radius:999px;padding:3px 6px;font-size:7px;font-weight:900;white-space:nowrap;text-transform:uppercase;letter-spacing:.05em}
 .audience{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.06em}.pleasure{color:#fff;background:#343638;border:1px solid #4b4e50;border-radius:5px;padding:3px 6px}.night{color:var(--orange);background:#2e251d;border:1px solid #65411f;border-radius:5px;padding:3px 6px;white-space:nowrap}
 .timing{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,.85fr);gap:5px;background:var(--warm);border:1px solid #5d4028;border-radius:9px;padding:5px 7px}.timing.single{grid-template-columns:1fr}.timing-part{min-width:0}.timing-part+.timing-part{border-left:1px solid #61452f;padding-left:7px}.next-label{font-size:8px;text-transform:uppercase;letter-spacing:.075em;color:#d7a679;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.next-time{font-size:clamp(31px,3vw,53px);font-weight:900;line-height:.9;margin-top:3px;letter-spacing:-.045em;color:var(--orange);white-space:nowrap}.next-day{font-size:8px;color:#d5cec6;margin-top:4px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.notice-main{font-size:clamp(20px,1.8vw,32px);font-weight:950;line-height:1;color:var(--orange);margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.notice-sub{font-size:8px;color:#eee5dc;margin-top:5px;font-weight:750;line-height:1.2;white-space:normal}.following-time{font-size:clamp(22px,2vw,34px);font-weight:900;line-height:.95;margin-top:6px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.following-day{font-size:8px;color:#bfb7ae;margin-top:4px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.data-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}.data-box{min-width:0;border-radius:8px;padding:5px 6px;background:var(--pale);border:1px solid var(--line)}.data-label{font-size:7px;text-transform:uppercase;letter-spacing:.065em;color:#c18b5b;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.water-value,.wind-value{font-size:clamp(17px,1.55vw,28px);font-weight:900;line-height:1;margin-top:3px;color:var(--orange);white-space:nowrap}.data-detail{font-size:7px;line-height:1.15;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.live-value{font-size:clamp(11px,1vw,17px);font-weight:900;line-height:1.05;margin-top:4px;color:#f5f3ef;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.live-detail{font-size:7px;color:var(--muted);margin-top:4px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.data-row{display:grid;grid-template-columns:minmax(72px,.58fr) minmax(72px,.58fr) minmax(0,1.84fr);gap:4px}.data-box{min-width:0;border-radius:8px;padding:5px 6px;background:var(--pale);border:1px solid var(--line)}.data-label{font-size:7px;text-transform:uppercase;letter-spacing:.065em;color:#c18b5b;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.water-value,.wind-value{font-size:clamp(14px,1.25vw,22px);font-weight:900;line-height:1;margin-top:4px;color:var(--orange);white-space:nowrap}.data-detail{font-size:6.5px;line-height:1.15;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.message-box{background:#30271f;border-color:#6b4726}.message-head{display:flex;align-items:center;justify-content:space-between;gap:5px}.message-source{font-size:7px;font-weight:950;letter-spacing:.08em;color:#fff;background:var(--orange2);border-radius:4px;padding:2px 5px;white-space:nowrap}.live-value{font-size:10px;font-weight:900;line-height:1.05;color:#e3b17f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:uppercase}.message-times{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:5px}.message-time{min-width:0;border-left:2px solid #76502e;padding-left:5px}.message-time:first-child{border-left:0;padding-left:0}.message-time-label{font-size:6.5px;text-transform:uppercase;color:#c8b5a4;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.message-time-value{font-size:clamp(11px,1vw,17px);font-weight:950;color:#fff;margin-top:2px;line-height:1.05;white-space:nowrap}.message-time-value.accent{color:var(--orange)}.live-detail{font-size:6.5px;color:var(--muted);margin-top:4px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @keyframes windWarningBlink{0%,100%{color:#fff;background:#3a3b3d;border-color:#fff;box-shadow:0 0 0 rgba(255,138,28,0)}50%{color:var(--orange);background:#3b2819;border-color:var(--orange);box-shadow:0 0 15px rgba(255,138,28,.72)}}.wind-alert{animation:windWarningBlink 1s steps(1,end) infinite}.wind-alert .data-label,.wind-alert .data-detail,.wind-alert .wind-value{color:inherit}@media(prefers-reduced-motion:reduce){.wind-alert{animation-duration:2.4s}}
 .schedule{background:#292b2d;border:1px solid #3c3e40;border-radius:7px;padding:4px 6px;font-size:8px;line-height:1.15;color:#c9c3bc;overflow:hidden;min-height:35px}.schedule-row{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.schedule-row+ .schedule-row{margin-top:2px}.schedule strong{color:var(--orange)}.schedule .professional strong{color:#fff}
 .foot{display:flex;justify-content:space-between;align-items:center;gap:5px;padding-top:3px;border-top:1px solid var(--line);font-size:6.5px;color:var(--muted);min-height:12px}.foot>span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.links{display:flex;gap:6px;flex:0 0 auto}.foot a{color:var(--orange);font-weight:900;text-decoration:none}.status{position:fixed;right:7px;bottom:2px;font-size:7px;color:#b7afa7;background:rgba(27,28,29,.94);border:1px solid #3b3d3f;padding:2px 5px;border-radius:5px;pointer-events:none}
@@ -1835,12 +1868,19 @@ function wind(b){
 }
 function live(b){
   const value=b.liveLabel.replace(/^(?:NDW|BAS):\\s*/,"");
-  if(b.liveSource==='BAS'){
-    if(b.basStatus==='active'&&b.liveEnd){const d=new Date(b.liveEnd);return {value,detail:'Tot '+dayFmt.format(d)+' '+timeFmt.format(d)};}
-    if(b.liveStart){const d=new Date(b.liveStart);return {value,detail:'Vanaf '+dayFmt.format(d)+' '+timeFmt.format(d)};}
-  }
-  if(b.liveStart){const d=new Date(b.liveStart);return {value,detail:dayFmt.format(d)+' '+timeFmt.format(d)};}
-  return {value,detail:b.liveMessage};
+  const formatMoment=iso=>{if(!iso)return '—';const d=new Date(iso);return dayFmt.format(d)+' '+timeFmt.format(d)};
+  const formatClock=iso=>iso?timeFmt.format(new Date(iso)):'—';
+  const interim=b.liveInterimStart&&b.liveInterimEnd
+    ? formatClock(b.liveInterimStart)+'–'+formatClock(b.liveInterimEnd)
+    : 'Geen gemeld';
+  return {
+    source:b.liveSource==='PIN'?'PIN-BERICHT':b.liveSource==='BAS'?'BAS-BERICHT':'NDW',
+    value,
+    start:formatMoment(b.liveStart),
+    end:formatMoment(b.liveEnd),
+    interim,
+    detail:b.liveMessage||''
+  };
 }
 function noticeContent(b){
   if(Array.isArray(b.specialPassages)&&b.specialPassages.length){
@@ -1874,10 +1914,10 @@ function render(data){
     const windTitle=windAlert?'Windwaarschuwing: '+v.bft+' Bft is hoger dan '+b.windAlertAboveBft+' Bft':'Actuele wind';
     const article=document.createElement('article');article.className='card';article.dataset.live=b.liveStatus;
     article.innerHTML=
-      '<div class="top"><div><h2>'+escapeHtml(b.name)+'</h2><div class="short">'+escapeHtml(b.short)+'</div></div><span class="badge">'+escapeHtml(b.liveLabel.replace(/^(?:NDW|BAS):\\s*/,''))+'</span></div>'+
+      '<div class="top"><div><h2>'+escapeHtml(b.name)+'</h2><div class="short">'+escapeHtml(b.short)+'</div></div><span class="badge">'+escapeHtml(b.liveSource==='PIN'?'PIN':b.liveSource==='BAS'?'BAS':'LIVE')+'</span></div>'+
       '<div class="audience"><span class="pleasure">'+escapeHtml(audienceLabel)+'</span>'+nightPassage+'</div>'+ 
       timingHtml+ 
-      '<div class="data-row"><div class="data-box"><div class="data-label">Waterstand</div><div class="water-value">'+escapeHtml(w.value)+'</div><div class="data-detail" title="'+escapeHtml(b.waterLocationName||'')+'">'+escapeHtml(w.detail)+'</div></div><div class="'+windBoxClass+'" title="'+escapeHtml(windTitle)+'"><div class="data-label">Wind</div><div class="wind-value">'+escapeHtml(v.value)+'</div><div class="data-detail" title="'+escapeHtml(b.windLocationName||'')+'">'+escapeHtml(v.detail)+'</div></div><div class="data-box"><div class="data-label">'+escapeHtml(b.liveSource==='BAS'?'Actueel BAS-bericht':'Concrete opening NDW')+'</div><div class="live-value">'+escapeHtml(l.value)+'</div><div class="live-detail">'+escapeHtml(l.detail)+'</div></div></div>'+
+      '<div class="data-row"><div class="data-box"><div class="data-label">Waterstand</div><div class="water-value">'+escapeHtml(w.value)+'</div><div class="data-detail" title="'+escapeHtml(b.waterLocationName||'')+'">'+escapeHtml(w.detail)+'</div></div><div class="'+windBoxClass+'" title="'+escapeHtml(windTitle)+'"><div class="data-label">Wind</div><div class="wind-value">'+escapeHtml(v.value)+'</div><div class="data-detail" title="'+escapeHtml(b.windLocationName||'')+'">'+escapeHtml(v.detail)+'</div></div><div class="data-box message-box"><div class="message-head"><span class="message-source">'+escapeHtml(l.source)+'</span><span class="live-value">'+escapeHtml(l.value)+'</span></div><div class="message-times"><div class="message-time"><div class="message-time-label">Van</div><div class="message-time-value">'+escapeHtml(l.start)+'</div></div><div class="message-time"><div class="message-time-label">Tot</div><div class="message-time-value accent">'+escapeHtml(l.end)+'</div></div><div class="message-time"><div class="message-time-label">Tussentijdse opening</div><div class="message-time-value">'+escapeHtml(l.interim)+'</div></div></div><div class="live-detail">'+escapeHtml(l.detail)+'</div></div></div>'+
       '<div class="schedule"><div class="schedule-row"><strong>Pleziervaart:</strong> '+escapeHtml(b.scheduleText)+'</div><div class="schedule-row professional"><strong>Beroepsvaart:</strong> '+escapeHtml(b.professionalText||'Afwijkende voorwaarden mogelijk; controleer Vaarweginformatie.')+'</div></div>'+ 
       '<div class="foot"><span title="Water: '+escapeHtml(b.waterLocationName||'RWS meetpunt')+' · Wind: '+escapeHtml(b.windLocationName||'RWS windmeetpunt')+'">RWS water · wind: '+escapeHtml(b.windLocationName||'onbekend')+'</span><span class="links">'+(b.liveSource==='BAS'?'<a href="'+escapeHtml(b.basSourceUrl)+'" target="_blank" rel="noopener">BAS</a>':'')+'<a href="'+escapeHtml(b.scheduleSource)+'" target="_blank" rel="noopener">tijden</a><a href="'+escapeHtml(b.waterSourceUrl||'https://waterinfo.rws.nl/')+'" target="_blank" rel="noopener">metingen</a></span></div>';
     cards.appendChild(article);
