@@ -1,0 +1,26 @@
+name: Fix current station selection
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-current-station-selection.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fix current station selection
+        run: python .github/scripts/fix_current_station_selection.py
+      - name: Validate JavaScript
+        run: node --check server.mjs
+      - name: Commit dashboard update
+        run: |
+          git config user.name "brugopen-auto"
+          git config user.email "actions@users.noreply.github.com"
+          git add server.mjs
+          git commit -m "Use waterway-matched current stations"
+          git push
