@@ -375,19 +375,26 @@ function futureCandidates(now, builder, days = 14) {
 function fixedQuarterTimes(localDate) {
   const weekend = isWeekendOrHoliday(localDate);
   const values = [];
-  for (let hour = 6; hour < 22; hour += 1) {
+
+  for (let hour = 0; hour < 24; hour += 1) {
     for (const minute of [15, 45]) {
       const total = hour * 60 + minute;
-      if (total < 6 * 60 + 30 || total >= 22 * 60) continue;
+
       if (!weekend) {
-        const morningBan = total >= 6 * 60 + 30 && total < 9 * 60 + 30;
-        const eveningBan = total >= 15 * 60 + 30 && total < 18 * 60 + 30;
+        const morningBan =
+          total >= 6 * 60 + 30 && total < 9 * 60 + 30;
+        const eveningBan =
+          total >= 15 * 60 + 30 && total < 18 * 60 + 30;
+
         if (morningBan || eveningBan) continue;
       }
+
       values.push([hour, minute]);
     }
   }
+
   return values;
+}
 }
 
 function spijkenisseTimes(localDate) {
