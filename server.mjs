@@ -761,6 +761,7 @@ function parseNdwBridgeFeed(xml) {
         .filter(Boolean)
     );
     const opportunities = scheduleOpportunities(bridge, now);
+    const liveEvent = selectEvent(records, now.getTime());
     return {
       ...bridge,
       nextOpportunity: opportunities.first?.toISOString() ?? null,
@@ -768,7 +769,8 @@ function parseNdwBridgeFeed(xml) {
       followingOpportunityText: opportunities.followingText ?? null,
       opportunityLabel: opportunities.label,
       opportunityState: opportunities.state,
-      ...selectEvent(records, now.getTime())
+      ...liveEvent,
+      isOpen: liveEvent.liveStatus === "open"
     };
   });
 
@@ -2043,7 +2045,7 @@ function render(data){
     const windTitle=windAlert?'Windwaarschuwing: '+v.bft+' Bft heeft de bedieningsgrens van '+b.windAlertAboveBft+' Bft bereikt':'Actuele wind';
     const article=document.createElement('article');article.className='card';article.dataset.live=b.liveStatus;
     article.innerHTML=
-      '<div class="top"><div><h2>'+escapeHtml(b.name)+'</h2><div class="short">'+escapeHtml(b.short)+'</div></div><span class="badge">'+escapeHtml(b.liveSource==='PIN'?'PIN':b.liveSource==='BAS'?'BAS':'LIVE')+'</span></div>'+
+      '<div class="top"><div><h2>'+escapeHtml(b.name+(b.isOpen?' - GEOPEND':''))+'</h2><div class="short">'+escapeHtml(b.short)+'</div></div><span class="badge">'+escapeHtml(b.liveSource==='PIN'?'PIN':b.liveSource==='BAS'?'BAS':'LIVE')+'</span></div>'+
       '<div class="audience"><span class="pleasure">'+escapeHtml(audienceLabel)+'</span>'+nightPassage+'</div>'+ 
       timingHtml+ 
       '<div class="data-row"><div class="data-box"><div class="data-label">Waterstand</div><div class="water-value">'+escapeHtml(w.value)+'</div><div class="data-unit water-unit">'+escapeHtml(w.unit)+' '+escapeHtml(w.datum)+'</div><div class="data-detail" title="'+escapeHtml(b.waterLocationName||'')+'">'+escapeHtml(w.detail)+'</div></div><div class="'+windBoxClass+'" title="'+escapeHtml(windTitle)+'"><div class="data-label">'+escapeHtml(windLabel)+'</div><div class="wind-value">'+escapeHtml(v.value)+'</div><div class="data-unit">'+escapeHtml(v.unit)+'</div><div class="data-detail" title="'+escapeHtml(b.windLocationName||'')+'">'+escapeHtml(v.detail)+'</div></div><div class="data-box" title="'+escapeHtml(b.currentLocationName||'Geen RWS stroommeetpunt')+'"><div class="data-label">Stroming</div><div class="current-value">'+(c.direction?'<span class="current-arrow" style="--direction:'+escapeHtml(c.degrees)+'deg">↑</span>':'')+escapeHtml(c.value)+'</div><div class="data-unit">'+escapeHtml(c.unit)+'</div><div class="data-detail">'+escapeHtml(c.detail)+'</div></div><div class="data-box message-box"><div class="message-head"><span class="message-source">'+escapeHtml(l.source)+'</span><span class="live-value">'+escapeHtml(l.value)+'</span></div><div class="restriction-period"><div class="restriction-label">Stremming</div><div class="restriction-value">'+escapeHtml(l.start)+'<span class="restriction-arrow">→</span>'+escapeHtml(l.end)+'</div></div>'+interimHtml+'<div class="live-detail">'+escapeHtml(l.detail)+'</div></div></div>'+
