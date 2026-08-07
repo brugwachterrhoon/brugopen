@@ -19,6 +19,7 @@ Per brug toont de site uitsluitend live geverifieerde officiële gegevens over:
 - alle actieve en komende BAS/scheepvaartberichten die op Vaarweginformatie aan de brug zijn gekoppeld;
 - officiële waterstandsverwachting voor het openingstijdstip, of duidelijk gelabeld de laatste meting;
 - officiële KNMI-windverwachting voor het openingstijdstip, of duidelijk gelabeld een actuele meting;
+- actuele RWS-stroomsnelheid en stromingsrichting van het dichtstbijzijnde officiële meetpunt, inclusief afstand en meettijd;
 - bron-URL en informatietijd.
 
 ## Installatie
@@ -45,6 +46,7 @@ Er zijn geen npm-pakketten nodig; de site gebruikt alleen ingebouwde Node.js-fun
 
 - Bij laden en vervolgens elke vijf minuten roept de browser `/api/dashboard` aan.
 - De server controleert per brug de officiële Vaarweginformatie/BAS-datastroom, de NDW-planningsfeed en RWS Waterinfo.
+- De browser en server verversen de meetgegevens iedere vijf minuten. Ontbreekt binnen 25 km een officieel stroommeetpunt, dan verschijnt geen schatting maar “Geen actuele stroommeting beschikbaar”.
 - Een actieve BAS-stremming of bedieningsbeperking krijgt voorrang op een gewone NDW-openingsmelding. De eindtijd wordt als “tot …” getoond.
 - Als één BAS-controle mislukt, blijft dat zichtbaar als bronfout en worden voor die brug geen BAS-conclusies verzonnen.
 
