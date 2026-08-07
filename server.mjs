@@ -53,6 +53,7 @@ const WIND_LOCATION_FALLBACKS = {
 const BRIDGES = [
   {
     id: "botlekbrug",
+    clearanceNap: "14,00 m NAP",
     windAlertAboveBft: 8,
     name: "Botlekbrug",
     short: "A15 · Oude Maas",
@@ -70,6 +71,7 @@ const BRIDGES = [
   },
   {
     id: "spijkenisserbrug",
+    clearanceNap: "12,40 m NAP",
     windAlertAboveBft: 9,
     name: "Spijkenisserbrug",
     short: "S102 · Oude Maas",
@@ -87,6 +89,7 @@ const BRIDGES = [
   },
   {
     id: "brug-over-de-noord",
+    clearanceNap: "7,55 m NAP",
     windAlertAboveBft: 5,
     name: "Brug over de Noord",
     short: "Alblasserdamsebrug · N915",
@@ -103,6 +106,7 @@ const BRIDGES = [
   },
   {
     id: "papendrechtsebrug",
+    clearanceNap: "11,30 m NAP",
     windAlertAboveBft: 5,
     name: "Papendrechtsebrug",
     short: "Merwedebrug · N3",
@@ -136,6 +140,7 @@ const BRIDGES = [
   },
   {
     id: "hartelbrug",
+    clearanceNap: "9,95 m NAP",
     windAlertAboveBft: 6,
     name: "Hartelbrug",
     short: "N218 · Hartelkanaal",
@@ -152,6 +157,7 @@ const BRIDGES = [
   },
   {
     id: "wantijbrug",
+    clearanceNap: "6,27 m NAP",
     windAlertAboveBft: 6,
     name: "Wantijbrug",
     short: "N3 · Dordrecht",
@@ -168,6 +174,7 @@ const BRIDGES = [
   },
   {
     id: "van-brienenoordbrug",
+    clearanceNap: "19,50 m NAP",
     windAlertAboveBft: 5,
     name: "Van Brienenoordbrug",
     short: "A16 · Nieuwe Maas",
@@ -199,6 +206,7 @@ const BRIDGES = [
   },
   {
     id: "calandbrug",
+    clearanceNap: "11,70 m NAP",
     windAlertAboveBft: 8,
     name: "Calandbrug",
     short: "N15 · Calandkanaal",
@@ -230,6 +238,7 @@ const BRIDGES = [
   },
   {
     id: "merwedebrug-gorinchem",
+    clearanceNap: "11,90 m NAP",
     windAlertAboveBft: 5,
     name: "Merwedebrug Gorinchem",
     short: "A27 · Boven-Merwede",
@@ -1951,7 +1960,7 @@ html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);f
 main{height:100dvh;padding:6px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:6px}
 .card{min-height:0;background:var(--card);border:1px solid var(--line);border-top:3px solid var(--orange);border-radius:11px;box-shadow:var(--shadow);padding:7px 8px;display:flex;flex-direction:column;gap:4px;overflow:hidden}
 .top{display:flex;justify-content:space-between;align-items:flex-start;gap:6px;min-height:34px}
-h2{margin:0;font-size:clamp(20px,1.55vw,30px);line-height:.98;letter-spacing:-.025em;color:#fff}.short{font-size:9px;color:var(--muted);margin-top:3px;font-weight:700}.badge{border:1px solid #5b4632;background:#30271f;color:var(--orange);border-radius:999px;padding:3px 6px;font-size:7px;font-weight:900;white-space:nowrap;text-transform:uppercase;letter-spacing:.05em}
+h2{margin:0;font-size:clamp(20px,1.55vw,30px);line-height:.98;letter-spacing:-.025em;color:#fff}.short{font-size:9px;color:var(--muted);margin-top:3px;font-weight:700}.top-actions{display:flex;align-items:center;gap:6px;flex:0 0 auto}.badge,.clearance-badge{height:30px;display:inline-flex;align-items:center;justify-content:center;border:1px solid #5b4632;background:#30271f;border-radius:999px;padding:4px 10px;font-weight:950;white-space:nowrap;letter-spacing:.04em}.badge{min-width:62px;color:var(--orange);font-size:11px;text-transform:uppercase}.clearance-badge{min-width:112px;color:#fff;font-size:13px}
 .audience{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.06em}.pleasure{color:#fff;background:#343638;border:1px solid #4b4e50;border-radius:5px;padding:3px 6px}.night{color:var(--orange);background:#2e251d;border:1px solid #65411f;border-radius:5px;padding:3px 6px;white-space:nowrap}
 .timing{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,.85fr);gap:5px;background:var(--warm);border:1px solid #5d4028;border-radius:9px;padding:5px 7px}.timing.single{grid-template-columns:1fr}.timing-part{min-width:0}.timing-part+.timing-part{border-left:1px solid #61452f;padding-left:7px}.next-label{font-size:8px;text-transform:uppercase;letter-spacing:.075em;color:#d7a679;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.next-time{font-size:clamp(31px,3vw,53px);font-weight:900;line-height:.9;margin-top:3px;letter-spacing:-.045em;color:var(--orange);white-space:nowrap}.next-day{font-size:8px;color:#d5cec6;margin-top:4px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.notice-main{font-size:clamp(20px,1.8vw,32px);font-weight:950;line-height:1;color:var(--orange);margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.notice-sub{font-size:8px;color:#eee5dc;margin-top:5px;font-weight:750;line-height:1.2;white-space:normal}.following-time{font-size:clamp(22px,2vw,34px);font-weight:900;line-height:.95;margin-top:6px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.following-day{font-size:8px;color:#bfb7ae;margin-top:4px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .data-row{display:grid;grid-template-columns:repeat(3,minmax(68px,.48fr)) minmax(0,1.72fr);gap:4px}.data-box{min-width:0;border-radius:8px;padding:5px 6px;background:var(--pale);border:1px solid var(--line)}.data-label{font-size:7px;text-transform:uppercase;letter-spacing:.065em;color:#ff8a1c;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}.water-value,.wind-value,.current-value{font-size:clamp(18px,1.35vw,25px);font-weight:950;line-height:.95;margin-top:4px;color:var(--orange);white-space:nowrap}.wind-value,.current-value{text-align:center}.data-unit{font-size:clamp(11px,.8vw,14px);font-weight:900;line-height:1;color:#fff;margin-top:2px;text-align:center}.water-datum{font-size:clamp(10px,.78vw,14px);font-weight:950;line-height:1;color:#ddd6ce;margin-top:4px}.data-detail{font-size:clamp(8px,.58vw,10px);font-weight:800;line-height:1.18;color:var(--muted);margin-top:3px;white-space:normal;overflow-wrap:anywhere;text-align:center}.message-box{background:#30271f;border-color:#6b4726}.message-head{display:flex;align-items:center;justify-content:space-between;gap:5px}.message-source{font-size:7px;font-weight:950;letter-spacing:.08em;color:#fff;background:var(--orange2);border-radius:4px;padding:2px 5px;white-space:nowrap}.live-value{max-width:58%;font-size:7px;font-weight:900;line-height:1;color:#ff8a1c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:uppercase}.restriction-period{margin-top:5px}.restriction-label,.interim-label{font-size:6.5px;text-transform:uppercase;color:#c8b5a4;font-weight:900;letter-spacing:.05em}.restriction-value{font-size:clamp(12px,1vw,17px);font-weight:950;color:#fff;margin-top:2px;line-height:1.05;white-space:nowrap}.restriction-arrow{color:var(--orange);padding:0 3px}.interim-row{display:flex;align-items:baseline;justify-content:space-between;gap:6px;border-top:1px solid #76502e;margin-top:5px;padding-top:4px}.interim-value{font-size:clamp(12px,1vw,17px);font-weight:950;color:var(--orange);white-space:nowrap}.live-detail{font-size:6.5px;color:var(--muted);margin-top:3px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -2058,7 +2067,7 @@ function render(data){
     const windTitle=windAlert?'Windwaarschuwing: '+v.bft+' Bft is hoger dan de bedieningsgrens van '+b.windAlertAboveBft+' Bft':'Actuele wind';
     const article=document.createElement('article');article.className='card';article.dataset.live=b.liveStatus;
     article.innerHTML=
-      '<div class="top"><div><h2>'+escapeHtml(b.name+(b.isOpen?' - GEOPEND':''))+'</h2><div class="short">'+escapeHtml(b.short)+'</div></div><span class="badge">'+escapeHtml(b.liveSource==='PIN'?'PIN':b.liveSource==='BAS'?'BAS':'LIVE')+'</span></div>'+
+      '<div class="top"><div><h2>'+escapeHtml(b.name+(b.isOpen?' - GEOPEND':''))+'</h2><div class="short">'+escapeHtml(b.short)+'</div></div><div class="top-actions"><span class="badge">'+escapeHtml(b.liveSource==='PIN'?'PIN':b.liveSource==='BAS'?'BAS':'LIVE')+'</span><span class="clearance-badge" title="Doorvaarthoogte gesloten/beweegbaar deel bij NAP">'+escapeHtml(b.clearanceNap||'—')+'</span></div></div>'+
       '<div class="audience"><span class="pleasure">'+escapeHtml(audienceLabel)+'</span>'+nightPassage+'</div>'+ 
       timingHtml+ 
       '<div class="data-row"><div class="data-box"><div class="data-label">Waterstand</div><div class="water-value">'+escapeHtml(w.value)+'</div><div class="data-unit water-unit">'+escapeHtml(w.unit)+' '+escapeHtml(w.datum)+'</div><div class="data-detail" title="'+escapeHtml(b.waterLocationName||'')+'">'+escapeHtml(w.detail)+'</div></div><div class="'+windBoxClass+'" title="'+escapeHtml(windTitle)+'"><div class="data-label">'+escapeHtml(windLabel)+'</div><div class="wind-value">'+escapeHtml(v.value)+'</div><div class="data-unit">'+escapeHtml(v.unit)+'</div><div class="data-detail" title="'+escapeHtml(b.windLocationName||'')+'">'+escapeHtml(v.detail)+'</div></div><div class="data-box" title="'+escapeHtml(b.currentLocationName||'Geen RWS stroommeetpunt')+'"><div class="data-label">Stroming</div><div class="current-value">'+escapeHtml(c.value)+'</div><div class="data-unit">'+escapeHtml(c.unit)+'</div><div class="data-detail">'+escapeHtml(c.detail)+'</div></div><div class="data-box message-box"><div class="message-head"><span class="message-source">'+escapeHtml(l.source)+'</span><span class="live-value">'+escapeHtml(l.value)+'</span></div><div class="restriction-period"><div class="restriction-label">Stremming</div><div class="restriction-value">'+escapeHtml(l.start)+'<span class="restriction-arrow">→</span>'+escapeHtml(l.end)+'</div></div>'+interimHtml+'<div class="live-detail">'+escapeHtml(l.detail)+'</div></div></div>'+
