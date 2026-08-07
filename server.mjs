@@ -395,7 +395,6 @@ function fixedQuarterTimes(localDate) {
 
   return values;
 }
-}
 
 function spijkenisseTimes(localDate) {
   const weekend = isWeekendOrHoliday(localDate);
@@ -418,7 +417,6 @@ function spijkenisseTimes(localDate) {
   }
 
   return values;
-}
 }
 
 function alblasserdamTimes(localDate) {
