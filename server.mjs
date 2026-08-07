@@ -63,8 +63,9 @@ const BRIDGES = [
     longitude: 4.3428,
     waterLocations: ["botlek.oudemaas.botlekbrug", "botlek.oudemaas", "hoogvliet", "spijkenisse.oudemaas.brug", "spijkenisse.oudemaas"],
     waterLocationLabel: "Botlek Oude Maas",
-    scheduleText: "Vaste mogelijkheden om :15 en :45. Op werkdagen niet voor pleziervaart tijdens 06:30–09:30 en 15:30–18:30.",
-    professionalText: "Voor beroepsvaart kunnen andere voorwaarden gelden.",
+    showNightPassage: false,
+    scheduleText: "Ma–vr pleziervaart: 00:00–06:30, 09:30–15:30 en 18:30–24:00. Tussen 06:00–22:00 bediening om :15 en :45.",
+    professionalText: "Beroepsvaart 24 uur per dag.",
     scheduleSource: "https://www.rijkswaterstaat.nl/wegen/projectenoverzicht/a15-botlekbrug-nieuwe-verbinding-weg-en-goederenspoorverkeer-scheepvaart-en-bromfietsers/hinder-en-maatregelen/scheepvaart"
   },
   {
@@ -79,8 +80,9 @@ const BRIDGES = [
     longitude: 4.331,
     waterLocations: ["spijkenisse.oudemaas.brug", "spijkenisse.oudemaas"],
     waterLocationLabel: "Spijkenisse Oude Maas",
-    scheduleText: "Vaste mogelijkheid op het halve uur. Op werkdagen niet voor pleziervaart tijdens 06:30–09:30 en 15:30–18:30.",
-    professionalText: "Voor beroepsvaart kunnen andere voorwaarden gelden.",
+    showNightPassage: false,
+    scheduleText: "Ma–vr pleziervaart elk uur op het halve uur; bedienvensters 00:00–06:30, 09:30–15:30 en 18:30–24:00. Za/zo/feest: elk uur op het halve uur.",
+    professionalText: "Beroepsvaart 24 uur per dag.",
     scheduleSource: "https://www.rijkswaterstaat.nl/wegen/projectenoverzicht/a15-botlekbrug-nieuwe-verbinding-weg-en-goederenspoorverkeer-scheepvaart-en-bromfietsers/hinder-en-maatregelen/scheepvaart"
   },
   {
