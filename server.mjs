@@ -50,6 +50,18 @@ const WIND_LOCATION_FALLBACKS = {
   "merwedebrug-gorinchem": ["bovenmerwede", "gorinchem", "gorinchembinnen", "werkendam"]
 };
 
+const CURRENT_LOCATION_HINTS = {
+  "botlekbrug": ["botlek", "oudemaas", "oude maas"],
+  "spijkenisserbrug": ["spijkenisse", "oudemaas", "oude maas"],
+  "brug-over-de-noord": ["alblasserdam", "noord"],
+  "papendrechtsebrug": ["papendrecht", "benedenmerwede", "beneden merwede"],
+  "hartelbrug": ["hartel", "hartelkanaal"],
+  "wantijbrug": ["wantij", "dordrecht"],
+  "van-brienenoordbrug": ["brienenoord", "nieuwemaas", "nieuwe maas"],
+  "calandbrug": ["caland", "calandkanaal"],
+  "merwedebrug-gorinchem": ["gorinchem", "bovenmerwede", "boven merwede"]
+};
+
 const BRIDGES = [
   {
     id: "botlekbrug",
@@ -1744,14 +1756,26 @@ function unavailableCurrent(message = "Geen actuele stroommeting beschikbaar") {
 }
 
 function currentForBridge(bridge, stations) {
-  let best = null;
+  const hints = CURRENT_LOCATION_HINTS[bridge.id] ?? [];
+  const scored = [];
+
   for (const station of stations) {
     if (!Number.isFinite(station.valueMps) || !Number.isFinite(station.latitude) || !Number.isFinite(station.longitude)) continue;
     const distanceKm = haversineKm(bridge.latitude, bridge.longitude, station.latitude, station.longitude);
-    if (!best || distanceKm < best.distanceKm) best = { station, distanceKm };
+    const stationText = `${station.locationCode || ""} ${station.locationName || ""}`.toLowerCase();
+    const matchesWaterway = hints.some((hint) => stationText.includes(hint));
+    scored.push({ station, distanceKm, matchesWaterway });
   }
 
-  if (!best || best.distanceKm > 25) return unavailableCurrent();
+  const preferred = scored
+    .filter((item) => item.matchesWaterway && item.distanceKm <= 25)
+    .sort((a, b) => a.distanceKm - b.distanceKm)[0];
+  const fallback = scored
+    .filter((item) => item.distanceKm <= 8)
+    .sort((a, b) => a.distanceKm - b.distanceKm)[0];
+  const best = preferred || fallback;
+
+  if (!best) return unavailableCurrent("Geen passend stroommeetpunt voor deze vaarweg gevonden");
   const { station, distanceKm } = best;
   const ageMs = Date.now() - timestamp(station.measuredAt);
   return {
@@ -1763,8 +1787,8 @@ function currentForBridge(bridge, stations) {
     currentDistanceKm: Math.round(distanceKm * 10) / 10,
     currentStatus: ageMs > 6 * 60 * 60 * 1000 ? "stale" : "current",
     currentMessage: ageMs > 6 * 60 * 60 * 1000
-      ? "Dichtstbijzijnde stroommeting is ouder dan 6 uur"
-      : "Dichtstbijzijnde actuele RWS-stroommeting",
+      ? "Stroommeting voor deze vaarweg is ouder dan 6 uur"
+      : best.matchesWaterway ? "Stroommeetpunt geselecteerd op dezelfde vaarweg" : "Dichtstbijzijnde passend stroommeetpunt",
     currentSourceUrl: WATER_SOURCE_URL
   };
 }
