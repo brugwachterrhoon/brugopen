@@ -64,13 +64,13 @@ const BRIDGES = [
     waterLocations: ["botlek.oudemaas.botlekbrug", "botlek.oudemaas", "hoogvliet", "spijkenisse.oudemaas.brug", "spijkenisse.oudemaas"],
     waterLocationLabel: "Botlek Oude Maas",
     showNightPassage: false,
-    scheduleText: "Ma–vr pleziervaart: 00:00–06:30, 09:30–15:30 en 18:30–24:00. Tussen 06:00–22:00 bediening om :15 en :45.",
+    scheduleText: "Ma–vr pleziervaart: 00:00–06:30, 09:30–15:30 en 18:30–24:00. Tussen 06:00–22:00 kwart over en kwart voor het hele uur.",
     professionalText: "Beroepsvaart 24 uur per dag.",
     scheduleSource: "https://www.rijkswaterstaat.nl/wegen/projectenoverzicht/a15-botlekbrug-nieuwe-verbinding-weg-en-goederenspoorverkeer-scheepvaart-en-bromfietsers/hinder-en-maatregelen/scheepvaart"
   },
   {
     id: "spijkenisserbrug",
-    windAlertAboveBft: 8,
+    windAlertAboveBft: 9,
     name: "Spijkenisserbrug",
     short: "S102 · Oude Maas",
     isrs: "NLSPI001110572700266",
@@ -97,13 +97,13 @@ const BRIDGES = [
     longitude: 4.6586,
     waterLocations: ["alblasserdam"],
     waterLocationLabel: "Alblasserdam",
-    scheduleText: "Zomerregeling met vaste pleziervaartmomenten; de twee eerstvolgende worden hierboven getoond.",
-    professionalText: "Beroepsvaart kan extra of afwijkende bediening hebben.",
+    scheduleText: "1 apr–31 okt ma–vr: 10:00, 11:00, 12:00, 13:00, 14:00, 16:00 en 18:15; 19:00–07:15 bij aanbod. Za/zo/feest: 09:00, 10:00, 11:00, 12:00, 13:00, 14:00, 16:00 en 18:00; 1 jun–30 sep ook 15:00; 19:00–07:15 bij aanbod. 1 nov–31 mrt bij aanbod.",
+    professionalText: "1 apr–31 okt ma–vr ook 09:15 alleen beroepsvaart. 1 nov–31 mrt ma–vr geen bediening 07:15–09:15 en 16:00–18:15.",
     scheduleSource: "https://www.vaarweginformatie.nl/frp/geo/detail/BRIDGE/43523"
   },
   {
     id: "papendrechtsebrug",
-    windAlertAboveBft: 6,
+    windAlertAboveBft: 5,
     name: "Papendrechtsebrug",
     short: "Merwedebrug · N3",
     isrs: "NLDOR001010577001143",
@@ -130,13 +130,13 @@ const BRIDGES = [
       { start: "2027-03-21T10:00:00+01:00", end: "2027-03-21T15:00:00+01:00" },
       { start: "2027-04-21T10:00:00+02:00", end: "2027-04-21T15:00:00+02:00" }
     ],
-    scheduleText: "Geen reguliere bediening tijdens de renovatie. Lage scheepvaart kan onder het vaste deel door, behalve tijdens afzonderlijk gemelde stremmingen.",
+    scheduleText: "Tijdelijke renovatieregeling heeft voorrang. Basisregeling vanaf 4 mei 2026: ma–vr 06:35 en 08:50 alleen beroepsvaart; 09:35 t/m 15:35 elk uur; 18:35; 19:35–06:00 bij aanbod. Za/zo/feest 08:50; 09:35 t/m 16:35 elk uur; 18:35; 19:35–07:35 bij aanbod; 1 jul–31 aug ook 17:35.",
     professionalText: "Hoge scheepvaart: gewijzigde bediening tot en met 31 augustus 2027; circa 1 aangekondigde passage per maand en minimaal 5 dagen vooraf aanmelden bij Verkeerspost Dordrecht.",
     scheduleSource: "https://www.vaarweginformatie.nl/frp/geo/detail/BRIDGE/47519"
   },
   {
     id: "hartelbrug",
-    windAlertAboveBft: 7,
+    windAlertAboveBft: 6,
     name: "Hartelbrug",
     short: "N218 · Hartelkanaal",
     isrs: "NLRTM0115B5487800010",
@@ -146,8 +146,8 @@ const BRIDGES = [
     longitude: 4.2258,
     waterLocations: ["europoort.hartelbrug", "hartelkanaal.vak81", "botlek.hartelkering.binnen"],
     waterLocationLabel: "Hartelkanaal bij Hartelbrug",
-    scheduleText: "24 uur op afroep, minimaal 2 uur vooraf. Werkdagen niet tijdens 06:45–08:30 en 16:00–18:30.",
-    professionalText: "Dezelfde afroepregeling; geen afzonderlijke tweede mogelijkheid weergegeven.",
+    scheduleText: "Ma–vr: 00:00–06:45, 08:30–16:00 en 18:30–24:00. Za/zo/feest: 00:00–24:00.",
+    professionalText: "Bedienvensters volgens regeling vanaf 4 mei 2026.",
     scheduleSource: "https://www.vaarweginformatie.nl/"
   },
   {
@@ -162,7 +162,7 @@ const BRIDGES = [
     longitude: 4.6915,
     waterLocations: ["dordrecht.wantij", "dordrecht.wantij.west", "dordrecht.oudemaas.benedenmerwede"],
     waterLocationLabel: "Wantij nabij Dordrecht",
-    scheduleText: "Zomer: werkdagen 09:30–15:30 en 18:30–22:00; weekend 09:30–22:00. Bij aanvraag of aanbod.",
+    scheduleText: "1 apr–31 okt ma–vr: 09:30–15:30 en 18:30–22:00; za/zo/feest 09:30–22:00. 1 nov–31 mrt ma–vr: 09:30–15:30 en 18:30–19:30; za/zo/feest 09:30–17:00. Geen bediening 25 en 26 december en 1 januari.",
     professionalText: "Beroepsvaart kan binnen dezelfde vensters voorrang hebben.",
     scheduleSource: "https://www.vaarweginformatie.nl/"
   },
@@ -187,14 +187,14 @@ const BRIDGES = [
       "beverwaard.nieuwemaas"
     ],
     waterLocationLabel: "Nieuwe Maas bij Brienenoord",
-    audienceLabel: "Geen pleziervaart",
+    audienceLabel: "Bediening op aanvraag",
     showNightPassage: false,
-    displayMode: "notice",
-    timingTitle: "Pleziervaart",
-    timingMain: "Geen bediening",
-    timingSub: "De Van Brienenoordbrug wordt niet geopend voor pleziervaart",
-    scheduleText: "Geen bediening voor pleziervaart.",
-    professionalText: "Op afroep 11:00–11:10, 14:00–14:10 en 19:30–19:40. Nacht 00:00–06:00 alleen na minimaal 12 uur vooraf aanvragen en goedkeuring; tussen 21:00–06:00 minimaal 1 uur tussen openingen.",
+    displayMode: "schedule",
+    timingTitle: "Bediening op aanvraag",
+    timingMain: "11:00 · 14:00 · 19:30",
+    timingSub: "Aanvraag minimaal 12 uur vooraf",
+    scheduleText: "Alle dagen op aanvraag minimaal 12 uur vooraf: 11:00, 14:00 en 19:30; daarnaast 21:00–06:00. Niet voor zeilschepen / bruine vloot.",
+    professionalText: "Aanvragen via vc-zwm-brienenoordbrug@rws.nl.",
     scheduleSource: "https://www.vaarweginformatie.nl/"
   },
   {
@@ -218,14 +218,14 @@ const BRIDGES = [
       "botlek.rozenburgsesluis.hartelkanaal"
     ],
     waterLocationLabel: "Calandkanaal bij Calandbrug",
-    audienceLabel: "Geen pleziervaart",
+    audienceLabel: "24 uur bediening",
     showNightPassage: false,
-    displayMode: "notice",
-    timingTitle: "Pleziervaart",
-    timingMain: "Geen bediening",
-    timingSub: "De Calandbrug wordt niet geopend voor pleziervaart",
-    scheduleText: "Geen bediening voor pleziervaart.",
-    professionalText: "Dagelijks 00:00–23:59 op afroep. Verzoek circa 20 minuten vóór passage via VHF 22. Bediening tot en met gemiddeld 20,7 m/s wind (indicatief 8 Bft).",
+    displayMode: "schedule",
+    timingTitle: "Bediening",
+    timingMain: "24 uur per dag",
+    timingSub: "Dagelijks",
+    scheduleText: "Dagelijks 24 uur per dag.",
+    professionalText: "Dagelijks 24 uur per dag volgens de regeling vanaf 4 mei 2026.",
     scheduleSource: "https://www.vaarweginformatie.nl/"
   },
   {
@@ -240,8 +240,8 @@ const BRIDGES = [
     longitude: 4.96924,
     waterLocations: ["bovenmerwede", "gorinchem", "gorinchembinnen", "werkendam"],
     waterLocationLabel: "Boven-Merwede bij Gorinchem",
-    scheduleText: "Tot 17 augustus 2026 20:00 geen bediening. Daarna: werkdagen 20:00; weekend 11:00, 13:00 en in juli/augustus ook 14:00.",
-    professionalText: "Nachtvensters zijn bij aanbod; op werkdagen minimaal 24 uur vooraf melden. Niet als vaste pleziervaarttijd getoond.",
+    scheduleText: "Ma–vr: 11:00, 13:00 en 20:00; 22:00–04:30 bij aanbod. Za/zo/feest: 11:00 en 13:00; 20:00–08:00 bij aanbod. 1 jul–31 aug ook 14:00.",
+    professionalText: "Bediening bij aanbod in de genoemde nachtvensters.",
     scheduleSource: "https://www.vaarweginformatie.nl/frp/geo/detail/BRIDGE/23300"
   }
 ];
@@ -382,6 +382,8 @@ function fixedQuarterTimes(localDate) {
     for (const minute of [15, 45]) {
       const total = hour * 60 + minute;
 
+      if (total < 6 * 60 || total >= 22 * 60) continue;
+
       if (!weekend) {
         const morningBan =
           total >= 6 * 60 + 30 && total < 9 * 60 + 30;
@@ -422,27 +424,40 @@ function spijkenisseTimes(localDate) {
 }
 
 function alblasserdamTimes(localDate) {
-  const summer = localDate.month >= 6 && localDate.month <= 10;
-  if (!summer) return [];
+  const season = localDate.month >= 4 && localDate.month <= 10;
+  if (!season) return [];
   const weekend = isWeekendOrHoliday(localDate);
-  const base = [[10, 0], [11, 0], [12, 0], [13, 0], [14, 0], [16, 0]];
-  return weekend
-    ? [[9, 0], ...base, [15, 0], [18, 0]]
-    : [[9, 15], ...base, [18, 15]];
-}
-
-function gorinchemTimes(localDate) {
-  const key = dateKey(localDate);
-  if (key < "2026-08-17" || key > "2027-12-31") return [];
-  const weekend = isWeekendOrHoliday(localDate);
-  if (!weekend) return [[20, 0]];
-  const values = [[11, 0], [13, 0]];
-  if (localDate.month === 7 || localDate.month === 8) values.push([14, 0]);
+  if (!weekend) return [[10, 0], [11, 0], [12, 0], [13, 0], [14, 0], [16, 0], [18, 15]];
+  const values = [[9, 0], [10, 0], [11, 0], [12, 0], [13, 0], [14, 0], [16, 0], [18, 0]];
+  if (localDate.month >= 6 && localDate.month <= 9) values.push([15, 0]);
+  values.sort((a, b) => (a[0] * 60 + a[1]) - (b[0] * 60 + b[1]));
   return values;
 }
 
+function gorinchemTimes(localDate) {
+  const weekend = isWeekendOrHoliday(localDate);
+  const values = [[11, 0], [13, 0]];
+  if (!weekend) values.push([20, 0]);
+  if (localDate.month === 7 || localDate.month === 8) values.push([14, 0]);
+  values.sort((a, b) => (a[0] * 60 + a[1]) - (b[0] * 60 + b[1]));
+  return values;
+}
+
+function brienenoordTimes(localDate) {
+  return [[11, 0], [14, 0], [19, 30]];
+}
+
+function wantijWindows(localDate) {
+  const key = dateKey(localDate);
+  if (key.endsWith('-01-01') || key.endsWith('-12-25') || key.endsWith('-12-26')) return [];
+  const weekend = isWeekendOrHoliday(localDate);
+  const summer = localDate.month >= 4 && localDate.month <= 10;
+  if (summer) return weekend ? [[9, 30, 22, 0]] : [[9, 30, 15, 30], [18, 30, 22, 0]];
+  return weekend ? [[9, 30, 17, 0]] : [[9, 30, 15, 30], [18, 30, 19, 30]];
+}
+
 function calandOpportunity(now) {
-  return new Date(now.getTime() + 20 * 60 * 1000);
+  return new Date(now);
 }
 
 function nextWindowOpportunity(now, windowsBuilder, labelWhenOpen = "Nu binnen bedientijd") {
@@ -463,20 +478,11 @@ function nextWindowOpportunity(now, windowsBuilder, labelWhenOpen = "Nu binnen b
 }
 
 function hartelOpportunity(now) {
-  const minimum = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-  const parts = zonedParts(minimum);
-  const localDate = { year: parts.year, month: parts.month, day: parts.day };
-  if (isWeekendOrHoliday(localDate)) {
-    return { instant: minimum, nowPossible: false, label: "Mogelijk na 2 uur voormelding" };
-  }
-  const total = parts.hour * 60 + parts.minute;
-  if (total >= 6 * 60 + 45 && total < 8 * 60 + 30) {
-    return { instant: candidate(localDate, 8, 30), nowPossible: false, label: "Na spits en 2 uur voormelding" };
-  }
-  if (total >= 16 * 60 && total < 18 * 60 + 30) {
-    return { instant: candidate(localDate, 18, 30), nowPossible: false, label: "Na spits en 2 uur voormelding" };
-  }
-  return { instant: minimum, nowPossible: false, label: "Mogelijk na 2 uur voormelding" };
+  const result = nextWindowOpportunity(now, (localDate) => {
+    if (isWeekendOrHoliday(localDate)) return [[0, 0, 23, 59]];
+    return [[0, 0, 6, 45], [8, 30, 16, 0], [18, 30, 23, 59]];
+  }, "Nu binnen bedientijd");
+  return result || { instant: null, nowPossible: false, label: "Geen bedientijd gevonden" };
 }
 
 function scheduleOpportunity(bridge, now = new Date()) {
@@ -497,10 +503,11 @@ function scheduleOpportunity(bridge, now = new Date()) {
     };
   }
   if (bridge.scheduleType === "brienenoord") {
-    return { instant: null, label: "Pleziervaart: minimaal 12 uur vooraf aanvragen", state: "request" };
+    const instant = futureCandidates(now, brienenoordTimes)[0] ?? null;
+    return { instant, label: "Op aanvraag · minimaal 12 uur vooraf", state: "request" };
   }
   if (bridge.scheduleType === "caland") {
-    return { instant: calandOpportunity(now), label: "Op afroep na circa 20 minuten", state: "request" };
+    return { instant: calandOpportunity(now), label: "Dagelijks 24 uur bediening", state: "request" };
   }
   if (bridge.scheduleType === "gorinchem") {
     const instant = futureCandidates(now, gorinchemTimes, 550)[0] ?? null;
@@ -517,12 +524,7 @@ function scheduleOpportunity(bridge, now = new Date()) {
     return { ...hartelOpportunity(now), state: "request" };
   }
   if (bridge.scheduleType === "wantij") {
-    const result = nextWindowOpportunity(now, (localDate) => {
-      const weekend = isWeekendOrHoliday(localDate);
-      return weekend
-        ? [[9, 30, 22, 0]]
-        : [[9, 30, 15, 30], [18, 30, 22, 0]];
-    }, "Nu mogelijk bij aanvraag/aanbod");
+    const result = nextWindowOpportunity(now, wantijWindows, "Nu mogelijk bij aanvraag/aanbod");
     return result
       ? { ...result, state: "window" }
       : { instant: null, label: "Geen bedientijd gevonden", state: "none" };
@@ -577,11 +579,12 @@ function scheduleOpportunities(bridge, now = new Date()) {
     };
   }
   if (bridge.scheduleType === "brienenoord") {
+    const values = futureCandidates(now, brienenoordTimes);
     return {
-      first: null,
-      following: null,
-      followingText: "Na aanvraag en goedkeuring",
-      label: "Minimaal 12 uur vooraf aanvragen",
+      first: values[0] ?? null,
+      following: values[1] ?? null,
+      followingText: "21:00–06:00 eveneens op aanvraag",
+      label: "Op aanvraag · minimaal 12 uur vooraf",
       state: "request"
     };
   }
@@ -589,8 +592,8 @@ function scheduleOpportunities(bridge, now = new Date()) {
     return {
       first: calandOpportunity(now),
       following: null,
-      followingText: "Daarna doorlopend op afroep",
-      label: "Verzoek circa 20 minuten vooraf",
+      followingText: "Doorlopend beschikbaar volgens standaardregeling",
+      label: "Dagelijks 24 uur bediening",
       state: "request"
     };
   }
@@ -621,12 +624,7 @@ function scheduleOpportunities(bridge, now = new Date()) {
     };
   }
   if (bridge.scheduleType === "wantij") {
-    const values = windowOpportunityList(now, (localDate) => {
-      const weekend = isWeekendOrHoliday(localDate);
-      return weekend
-        ? [[9, 30, 22, 0]]
-        : [[9, 30, 15, 30], [18, 30, 22, 0]];
-    });
+    const values = windowOpportunityList(now, wantijWindows);
     const firstIsNow = values[0] && Math.abs(values[0].getTime() - now.getTime()) < 60000;
     return {
       first: values[0] ?? null,
@@ -2053,11 +2051,11 @@ function render(data){
     const timingHtml=b.displayMode==='notice'
       ? '<div class="timing single notice-timing"><div class="timing-part"><div class="next-label">'+escapeHtml(notice.title)+'</div><div class="notice-main">'+escapeHtml(notice.main)+'</div><div class="notice-sub">'+escapeHtml(notice.sub)+'</div></div></div>'
       : '<div class="timing '+(f?'':'single')+'"><div class="timing-part"><div class="next-label">Eerste mogelijke bediening</div><div class="next-time">'+escapeHtml(o.time)+'</div><div class="next-day">'+escapeHtml(o.day)+'</div></div>'+(f?'<div class="timing-part"><div class="next-label">Daarna: volgende mogelijkheid</div><div class="following-time">'+escapeHtml(f.time)+'</div><div class="following-day">'+escapeHtml(f.day)+'</div></div>':'')+'</div>';
-    const windAlert=typeof v.bft==='number'&&typeof b.windAlertAboveBft==='number'&&v.bft>=b.windAlertAboveBft;
+    const windAlert=typeof v.bft==='number'&&typeof b.windAlertAboveBft==='number'&&v.bft>b.windAlertAboveBft;
     const interimHtml=l.interim?'<div class="interim-row"><span class="interim-label">Tussentijdse opening</span><span class="interim-value">'+escapeHtml(l.interim)+'</span></div>':'';
     const windBoxClass=windAlert?'data-box wind-alert':'data-box';
     const windLabel=windAlert?'Wind waarschuwing':'Wind';
-    const windTitle=windAlert?'Windwaarschuwing: '+v.bft+' Bft heeft de bedieningsgrens van '+b.windAlertAboveBft+' Bft bereikt':'Actuele wind';
+    const windTitle=windAlert?'Windwaarschuwing: '+v.bft+' Bft is hoger dan de bedieningsgrens van '+b.windAlertAboveBft+' Bft':'Actuele wind';
     const article=document.createElement('article');article.className='card';article.dataset.live=b.liveStatus;
     article.innerHTML=
       '<div class="top"><div><h2>'+escapeHtml(b.name+(b.isOpen?' - GEOPEND':''))+'</h2><div class="short">'+escapeHtml(b.short)+'</div></div><span class="badge">'+escapeHtml(b.liveSource==='PIN'?'PIN':b.liveSource==='BAS'?'BAS':'LIVE')+'</span></div>'+
