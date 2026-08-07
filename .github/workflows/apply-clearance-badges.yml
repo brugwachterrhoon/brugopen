@@ -1,0 +1,26 @@
+name: Apply bridge clearance badges
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-clearance-badges.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add clearance badges
+        run: python .github/scripts/add_clearance_badges.py
+      - name: Validate JavaScript
+        run: node --check server.mjs
+      - name: Commit dashboard update
+        run: |
+          git config user.name "brugopen-auto"
+          git config user.email "actions@users.noreply.github.com"
+          git add server.mjs
+          git commit -m "Show NAP clearance badge for every bridge"
+          git push
