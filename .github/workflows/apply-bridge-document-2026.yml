@@ -1,0 +1,26 @@
+name: Apply bridge document 2026
+
+on:
+  push:
+    paths:
+      - ".github/workflows/apply-bridge-document-2026.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply schedule changes
+        run: python .github/scripts/apply_bridge_document_2026.py
+      - name: Validate JavaScript
+        run: node --check server.mjs
+      - name: Commit updated dashboard
+        run: |
+          git config user.name "brugopen-auto"
+          git config user.email "actions@users.noreply.github.com"
+          git add server.mjs
+          git commit -m "Align dashboard with bridge schedule document 4 May 2026"
+          git push
