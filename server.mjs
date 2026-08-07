@@ -400,17 +400,25 @@ function fixedQuarterTimes(localDate) {
 function spijkenisseTimes(localDate) {
   const weekend = isWeekendOrHoliday(localDate);
   const values = [];
-  for (let hour = 6; hour < 22; hour += 1) {
+
+  for (let hour = 0; hour < 24; hour += 1) {
     const minute = 30;
+    const total = hour * 60 + minute;
+
     if (!weekend) {
-      const total = hour * 60 + minute;
-      const morningBan = total >= 6 * 60 + 30 && total < 9 * 60 + 30;
-      const eveningBan = total >= 15 * 60 + 30 && total < 18 * 60 + 30;
+      const morningBan =
+        total >= 6 * 60 + 30 && total < 9 * 60 + 30;
+      const eveningBan =
+        total >= 15 * 60 + 30 && total < 18 * 60 + 30;
+
       if (morningBan || eveningBan) continue;
     }
+
     values.push([hour, minute]);
   }
+
   return values;
+}
 }
 
 function alblasserdamTimes(localDate) {
