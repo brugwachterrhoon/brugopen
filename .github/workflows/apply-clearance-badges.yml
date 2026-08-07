@@ -24,3 +24,4 @@ jobs:
           git add server.mjs
           git commit -m "Show NAP clearance badge for every bridge"
           git push
+      # Triggered after dashboard clearance request
