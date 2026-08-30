@@ -36,12 +36,22 @@ function setCardLoading(card, loading) {
 }
 
 function text(element, value, fallback = "—") {
+  if (!element) return;
   element.textContent = value && String(value).trim() ? value : fallback;
 }
 
+function isPinBasText(value = "") {
+  const textValue = String(value || "");
+  return /\b(?:PIN|BAS)\b/i.test(textValue) || /pin\.portofrotterdam\.com/i.test(textValue);
+}
+
 function renderSources(container, sources) {
+  if (!container) return;
   container.replaceChildren();
-  for (const source of (sources || []).slice(0, 4)) {
+  const visibleSources = (sources || []).filter((source) => {
+    return !isPinBasText(source.title) && !isPinBasText(source.url);
+  });
+  for (const source of visibleSources.slice(0, 4)) {
     const link = document.createElement("a");
     link.href = source.url;
     link.target = "_blank";
@@ -50,6 +60,19 @@ function renderSources(container, sources) {
     link.textContent = source.title || "Officiële bron";
     container.append(link);
   }
+}
+
+function tidyConditionBoxes(card) {
+  const conditions = card.querySelector(".conditions");
+  if (!conditions) return;
+
+  for (const box of [...conditions.children]) {
+    const label = box.querySelector("small")?.textContent?.trim() || box.textContent?.trim() || "";
+    if (/^stroming\b/i.test(label) || /\bstroming\b/i.test(label)) box.remove();
+  }
+
+  const count = conditions.children.length;
+  if (count > 0) conditions.style.gridTemplateColumns = `repeat(${count}, minmax(0, 1fr))`;
 }
 
 function renderBridge(data) {
@@ -75,13 +98,17 @@ function renderBridge(data) {
 
   const notes = card.querySelector(".notes");
   notes.replaceChildren();
-  const items = [data.status_text, ...(data.notes || [])].filter(Boolean);
+  const items = [data.status_text, ...(data.notes || [])]
+    .filter(Boolean)
+    .filter((note) => !isPinBasText(note));
   for (const note of [...new Set(items)].slice(0, 4)) {
     const li = document.createElement("li");
     li.textContent = note;
     notes.append(li);
   }
+
   renderSources(card.querySelector(".card-sources"), data.sources);
+  tidyConditionBoxes(card);
 }
 
 function showDashboardError(message, checkedAt) {
