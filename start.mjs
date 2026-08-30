@@ -13,6 +13,10 @@ const replacements = [
     "--warm:#2b2d2f;"
   ],
   [
+    "border-top:3px solid var(--orange);",
+    "border-top:4px solid var(--orange);"
+  ],
+  [
     ".data-row{display:grid;grid-template-columns:repeat(3,minmax(68px,.48fr)) minmax(0,1.72fr);gap:4px}",
     ".data-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}"
   ],
