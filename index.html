@@ -5,7 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Live overzicht van de volgende toegestane brugopeningen, waterstanden en wind voor zes bruggen in Zuid-Holland.">
   <title>Brugwachter Live Dashboard</title>
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/styles.css?v=20260831-2">
+  <style>
+    /* Oude/cached stromingsvakken nooit tonen. De serverdata blijft beschikbaar voor berekeningen. */
+    .conditions > .current,
+    .conditions > .current-box,
+    .conditions > .current-metric,
+    .conditions > [data-metric="current"],
+    .conditions > div:has(.current-label),
+    .conditions > div:has(.current-value),
+    .conditions > div:has(.stream-label),
+    .conditions > div:has(.stream-value) { display:none !important; }
+    .conditions { grid-template-columns:repeat(2,minmax(0,1fr)) !important; }
+  </style>
 </head>
 <body>
   <header class="site-header">
@@ -120,7 +132,7 @@
         <a href="https://vaarweginformatie.nl/" target="_blank" rel="noopener noreferrer"><strong>Vaarweginformatie</strong><span>Bediening en scheepvaartberichten ↗</span></a>
         <a href="https://waterinfo.rws.nl/" target="_blank" rel="noopener noreferrer"><strong>Waterinfo</strong><span>Waterstanden en verwachtingen ↗</span></a>
         <a href="https://www.knmi.nl/nederland-nu/weer/waarnemingen" target="_blank" rel="noopener noreferrer"><strong>KNMI</strong><span>Officiële windinformatie ↗</span></a>
-        <a href="https://pin.portofrotterdam.com/" target="_blank" rel="noopener noreferrer"><strong>Haven Rotterdam</strong><span>PIN- en nautische berichten ↗</span></a>
+        <a href="https://pin.portofrotterdam.com/" target="_blank" rel="noopener noreferrer"><strong>Haven Rotterdam</strong><span>Nautische bron ↗</span></a>
       </div>
     </section>
 
@@ -128,6 +140,21 @@
   </main>
 
   <footer><span>Brugwachter Live · <span id="year"></span></span><span>Automatische controle iedere 5 minuten</span></footer>
-  <script src="/app.js" defer></script>
+  <script src="/app.js?v=20260831-2" defer></script>
+  <script>
+    /* Extra vangnet: verwijder zichtbaar Stroming-vak ook als oude HTML/JS het terugplaatst. */
+    const removeObsoleteDisplay = () => {
+      document.querySelectorAll('.conditions > div').forEach(box => {
+        const label = box.querySelector('small')?.textContent || box.textContent || '';
+        if (/stroming/i.test(label)) box.remove();
+      });
+      document.querySelectorAll('.conditions').forEach(group => {
+        const count = group.children.length;
+        if (count) group.style.gridTemplateColumns = `repeat(${count}, minmax(0, 1fr))`;
+      });
+    };
+    new MutationObserver(removeObsoleteDisplay).observe(document.body,{childList:true,subtree:true,characterData:true});
+    removeObsoleteDisplay();
+  </script>
 </body>
 </html>
