@@ -1,0 +1,32 @@
+name: Center water value
+
+on:
+  push:
+    paths:
+      - '.github/workflows/center-water-value.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Center water value
+        run: python .github/scripts/center_water_value.py
+      - name: Commit change
+        run: |
+          if git diff --quiet -- server.mjs; then
+            echo "No change needed"
+            exit 0
+          fi
+          git config user.name "brugopen-auto"
+          git config user.email "actions@users.noreply.github.com"
+          git add server.mjs
+          git commit -m "Center water level value"
+          git push
